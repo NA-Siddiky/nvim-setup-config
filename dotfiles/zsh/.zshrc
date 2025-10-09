@@ -1,4 +1,4 @@
-fastfetch
+# fastfetch
 # Add deno completions to search path
 # if [[ ":$FPATH:" != *":/home/mahi/.zsh/completions:"* ]]; then export FPATH="/home/mahi/.zsh/completions:$FPATH"; fi
 export ZSH="$HOME/.oh-my-zsh"
@@ -28,7 +28,7 @@ alias dev="~/Documents/Coding/Projects/setthemacup/scripts/dev.sh"
 eval "$(starship init zsh)"
 
 # fzf search
-source <(fzf --zsh)
+# source <(fzf --zsh)
 
 # history
 HISTFILE=~/.zsh_history
@@ -46,7 +46,7 @@ setopt histreduceblanks
 # Initialize zsh completions (added by deno install script)
 # autoload -Uz compinit
 # compinit
-eval "$(fnm env --use-on-cd --shell zsh)"
+# eval "$(fnm env --use-on-cd --shell zsh)"
 
 # pnpm
 export PNPM_HOME="/Users/mahi/Library/pnpm"
