@@ -1,0 +1,14 @@
+theme = "Nord"
+window-height = 24
+window-width = 80
+window-padding-x = 2
+window-padding-balance = true
+background-blur = true
+background-opacity = 0.94
+background-blur-radius = 60
+#background = #1a1f26
+font-family = "JetbrainsMono Nerd Font"
+font-size = 14
+# font-thicken = true
+# font-thicken-strength = 200
+macos-titlebar-style = "hidden"
