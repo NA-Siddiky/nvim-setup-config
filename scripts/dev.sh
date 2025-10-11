@@ -15,6 +15,17 @@ else
   # Change to work directory
   cd "$WORK_DIR" || exit 1
 
+  # Determine dev command based on lockfile; default to pnpm
+  if [ -f bun.lockb ]; then
+    DEV_CMD="bun dev"
+  elif [ -f pnpm-lock.yaml ]; then
+    DEV_CMD="pnpm dev"
+  elif [ -f package-lock.json ]; then
+    DEV_CMD="npm run dev"
+  else
+    DEV_CMD="pnpm dev"
+  fi
+
   # Create new session named "wick" with first window
   tmux new-session -d -s "$NAME" -n editor
 
@@ -29,7 +40,7 @@ else
 
   # Split window into two columns (left 50%, right 50%)
   tmux split-window -h -t "$NAME":dev
-  tmux send-keys -t "$NAME":dev.2 'pnpm dev' C-m
+  tmux send-keys -t "$NAME":dev.2 "$DEV_CMD" C-m
   sleep 0.1
 
   # Split the right pane into two (top 50%, bottom 50%)
