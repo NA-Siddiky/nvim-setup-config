@@ -19,10 +19,10 @@ alias zs="source ~/.zshrc"
 alias ls="eza"
 alias ll="eza -la"
 
-alias setup="vi ~/Documents/Coding/Projects/setthemacup/"
+alias setup="vi ~/projects/nvim-setup-config/"
 alias note="~/Documents/Coding/Projects/setthemacup/scripts/note.sh"
 alias wick="~/Documents/Coding/Projects/setthemacup/scripts/wick.sh"
-alias dev="~/Documents/Coding/Projects/setthemacup/scripts/dev.sh"
+alias dev="~/projects/nvim-setup-config/scripts/dev.sh"
 
 # starship
 eval "$(starship init zsh)"
@@ -55,3 +55,10 @@ case ":$PATH:" in
   *) export PATH="$PNPM_HOME:$PATH" ;;
 esac
 # pnpm end
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# opencode
+export PATH=/home/ubuntu/.opencode/bin:$PATH

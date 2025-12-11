@@ -29,7 +29,7 @@ else
 
   # Split window into two columns (left 50%, right 50%)
   tmux split-window -h -t "$NAME":dev
-  tmux send-keys -t "$NAME":dev.2 'pnpm dev' C-m
+  # tmux send-keys -t "$NAME":dev.2 'pnpm dev' C-m
   sleep 0.1
 
   # Split the right pane into two (top 50%, bottom 50%)

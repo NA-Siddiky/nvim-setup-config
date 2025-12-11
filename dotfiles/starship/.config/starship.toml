@@ -1,11 +1,18 @@
-[localip]
-ssh_only = false
-format = "[@$localipv4](italic) "
+# [localip]
+# ssh_only = false
+# format = "[@$localipv4](italic) "
+# disabled = false
+
+[custom.publicip]
+command = "curl -s https://ifconfig.me"
+format = "[@$output](italic) "
+when = true
 disabled = false
 
 [username]
-show_always = true
-format = "[$user]($style)"
+show_always = false
+# format = "[$user]($style)"
+format = "($style)"
 # Symbols
 [aws]
 symbol = "  "
