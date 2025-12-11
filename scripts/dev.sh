@@ -15,6 +15,17 @@ else
   # Change to work directory
   cd "$WORK_DIR" || exit 1
 
+  # Determine dev command based on lockfile; default to pnpm
+  if [ -f bun.lockb ]; then
+    DEV_CMD="bun dev"
+  elif [ -f pnpm-lock.yaml ]; then
+    DEV_CMD="pnpm dev"
+  elif [ -f package-lock.json ]; then
+    DEV_CMD="npm run dev"
+  else
+    DEV_CMD="pnpm dev"
+  fi
+
   # Create new session named "wick" with first window
   tmux new-session -d -s "$NAME" -n editor
 
