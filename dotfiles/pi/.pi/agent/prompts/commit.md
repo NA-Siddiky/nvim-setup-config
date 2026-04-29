@@ -14,7 +14,7 @@ Task:
    - Format: `type(scope): subject`
    - Types allowed: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
    - Subject: Imperative mood, lowercase, no period, max 50 characters
-   - Body (if needed): Wrap at 72 characters, explain _why_ not _how_
+   - Body (if needed): Wrap at 72 characters, explain _why_ not _how_. Keep it short. Preferably one liner
    - Footer: Flag breaking changes with `BREAKING CHANGE:`
 
 5. Display the generated commit message to the user in a code block

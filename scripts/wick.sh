@@ -19,12 +19,12 @@ else
   tmux new-session -d -s wick -n editor
 
   # Window 1: nvim with current directory
-  tmux send-keys -t wick:editor 'vi .' C-m
+  tmux send-keys -t wick:editor 'v .' C-m
   sleep 0.1
 
   # Window 2: Left - tests, Right - two panes (top: pnpm dev, bottom: focused)
   tmux new-window -t wick -n dev
-  tmux send-keys -t wick:dev 'cc' C-m
+  tmux send-keys -t wick:dev 'a' C-m
   sleep 0.1
 
   # Split window into two columns (left 80%, right 20%)

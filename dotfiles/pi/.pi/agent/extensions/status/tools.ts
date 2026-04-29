@@ -21,7 +21,7 @@ export function stripAnsi(str: string): string {
 
 export function buildLine(left: string, right: string): string {
   if (!right) return left;
-  const width = (process.stdout.columns ?? 80) - 2;
+  const width = (process.stdout.columns ?? 80) - 4;
   const pad = Math.max(
     1,
     width - stripAnsi(left).length - stripAnsi(right).length,

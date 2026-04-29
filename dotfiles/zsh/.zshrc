@@ -8,8 +8,8 @@ source $ZSH/oh-my-zsh.sh
 
 # aliases
 alias vm="NVIM_APPNAME=nvim.12 nvim"
-alias vi="nvim"
-alias ai="claude"
+alias v="nvim"
+alias a="pi"
 alias zc="vi ~/.zshrc"
 alias zs="source ~/.zshrc"
 alias ls="eza"

@@ -30,12 +30,12 @@ else
   tmux new-session -d -s "$NAME" -n editor
 
   # Window 1: nvim with current directory
-  tmux send-keys -t "$NAME":editor 'vi .' C-m
+  tmux send-keys -t "$NAME":editor 'v .' C-m
   sleep 0.1
 
   # Window 2: Left - tests, Right - two panes (top: pnpm dev, bottom: focused)
   tmux new-window -t "$NAME" -n dev
-  tmux send-keys -t "$NAME":dev 'pi' C-m
+  tmux send-keys -t "$NAME":dev 'a' C-m
   sleep 0.1
 
   # Split window into two columns (left 80%, right 20%)
