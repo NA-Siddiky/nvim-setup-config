@@ -4,4 +4,6 @@ dotfiles/pi/.pi/*/sessions/*
 dotfiles/pi/.pi/*/auth*
 
 # PI stats database
-dotfiles/pi/.pi/agent/stats.db*
+dotfiles/pi/.pi/agent/stats.db-wal
+dotfiles/pi/.pi/agent/stats.db-shm
+dotfiles/pi/.pi/agent/stats.db
