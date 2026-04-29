@@ -7,7 +7,7 @@ Role: Tech Lead.
 
 Task:
 
-1. Load the caveman-commit skill using `/skill:caveman-commit`
+1. check if the user has staged any changes. If not, ask them to stage changes.
 2. Analyze the staged diff via `git diff --cached`
 3. Generate a conventional commit message following the specification:
    - Format: `type(scope): subject`
@@ -17,8 +17,4 @@ Task:
    - Footer: Flag breaking changes with `BREAKING CHANGE:`
 
 4. Display the generated commit message to the user in a code block
-5. Ask the user: "Commit this? (y/n)"
-6. **Only if the user responds with 'y'**: Run `git commit -m "<message>"` with the generated message
-7. **If the user responds with 'n'**: Cancel and do not commit
-
-DO NOT auto-commit. Always wait for user confirmation.
+5. Commit the changes with the generated message and body (if any)
