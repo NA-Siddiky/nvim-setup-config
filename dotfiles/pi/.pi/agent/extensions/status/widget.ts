@@ -65,7 +65,10 @@ export class StatusWidget {
       provider,
       model: MODELS[id] ?? id,
       thinking: this.pi.getThinkingLevel(),
-      tokens: `${Math.round((usage?.tokens ?? 0) / 1000)}k`,
+      tokens: `${Intl.NumberFormat("en-US", {
+        notation: "compact",
+        maximumFractionDigits: 2,
+      }).format(usage?.tokens ?? 0)}`,
       percent: `${Math.round(usage?.percent ?? 0)}%`,
       project: this.ctx.cwd?.split("/").pop() ?? "root",
       branch: this.branch.get(),

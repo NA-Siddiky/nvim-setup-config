@@ -4,12 +4,38 @@ import { StatusWidget } from "./widget.js";
 export default function (pi: ExtensionAPI) {
   let widget: StatusWidget | undefined;
   let savedCtx: ExtensionContext | undefined;
+  let thinkingPollTimer: ReturnType<typeof setInterval> | undefined;
+  let lastThinkingLevel: string = "";
+
+  function startThinkingPoll() {
+    if (thinkingPollTimer !== undefined) return;
+    lastThinkingLevel = pi.getThinkingLevel();
+    thinkingPollTimer = setInterval(() => {
+      const current = pi.getThinkingLevel();
+      if (current !== lastThinkingLevel) {
+        lastThinkingLevel = current;
+        widget?.update();
+      }
+    }, 150);
+  }
+
+  function stopThinkingPoll() {
+    if (thinkingPollTimer !== undefined) {
+      clearInterval(thinkingPollTimer);
+      thinkingPollTimer = undefined;
+    }
+  }
 
   pi.on("session_start", (_, ctx: ExtensionContext) => {
     ctx.ui.setFooter(() => ({ render: () => [], invalidate() {} }));
     savedCtx = ctx;
     widget = ctx.model ? new StatusWidget(pi, ctx, ctx.model) : undefined;
     widget?.update();
+    startThinkingPoll();
+  });
+
+  pi.on("session_shutdown", () => {
+    stopThinkingPoll();
   });
 
   // BUG FIX: create widget if it doesn't exist yet (model wasn't set at session_start)

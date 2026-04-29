@@ -16,5 +16,6 @@
     "showTerminalProgress": true
   },
   "collapseChangelog": true,
-  "quietStartup": true
+  "quietStartup": true,
+  "theme": "gruvbox"
 }
