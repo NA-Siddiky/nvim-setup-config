@@ -2,8 +2,8 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
-import { MODELS, PROVIDERS, EMPTY_PROVIDER } from "./constants.js";
-import { GitBranchTracker, GitDirtyTracker } from "./git.js";
+import { MODELS, PROVIDERS } from "./constants.js";
+import { createBranchTracker, createDirtyTracker } from "./git.js";
 import { buildLine, formatTool } from "./tools.js";
 import type { WidgetData } from "./types.js";
 
@@ -12,8 +12,12 @@ type PiModel = NonNullable<ExtensionContext["model"]>;
 /* ─── ANSI shorthand ──────────────────────────────────────────────────────── */
 
 const R = "\x1b[0m";
+const TOKEN_FMT = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 2,
+});
 const ansi = (code: string, text: string) => `${code}${text}${R}`;
-const bold = (code: string, text: string) => `\x1b[1;${code}${text}${R}`;
+const bold = (code: string, text: string) => `\x1b[1m${code}${text}${R}`;
 
 /* ─── widget ──────────────────────────────────────────────────────────────── */
 
@@ -22,9 +26,8 @@ export class StatusWidget {
   private ctx: ExtensionContext;
   model?: PiModel;
 
-  // #7: branch now re-checks on each update via cached tracker (3s TTL)
-  private branch = new GitBranchTracker();
-  private dirty = new GitDirtyTracker();
+  private branch = createBranchTracker();
+  private dirty  = createDirtyTracker();
   private toolCounts = new Map<string, number>();
   private renderKey = "";
 
@@ -65,10 +68,7 @@ export class StatusWidget {
       provider,
       model: MODELS[id] ?? id,
       thinking: this.pi.getThinkingLevel(),
-      tokens: `${Intl.NumberFormat("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 2,
-      }).format(usage?.tokens ?? 0)}`,
+      tokens: TOKEN_FMT.format(usage?.tokens ?? 0),
       percent: `${Math.round(usage?.percent ?? 0)}%`,
       project: this.ctx.cwd?.split("/").pop() ?? "root",
       branch: this.branch.get(),
@@ -84,7 +84,7 @@ export class StatusWidget {
 
     const topLeft = [
       ansi(d.provider.color, `${d.provider.icon} ${d.provider.name}`),
-      bold("38;5;117m", `\uF005 ${d.model}`),
+      bold("\x1b[38;5;117m", `\uF005 ${d.model}`),
       ansi("\x1b[38;5;246m", `(${d.thinking})`),
       ansi("\x1b[38;5;114m", `\uF2DB ${d.tokens}`),
       ansi("\x1b[38;5;216m", `\uF0E7 ${d.percent}`),

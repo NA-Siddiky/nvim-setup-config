@@ -4,49 +4,46 @@ import { StatusWidget } from "./widget.js";
 export default function (pi: ExtensionAPI) {
   let widget: StatusWidget | undefined;
   let savedCtx: ExtensionContext | undefined;
-  let thinkingPollTimer: ReturnType<typeof setInterval> | undefined;
-  let lastThinkingLevel: string = "";
 
-  function startThinkingPoll() {
-    if (thinkingPollTimer !== undefined) return;
-    lastThinkingLevel = pi.getThinkingLevel();
-    thinkingPollTimer = setInterval(() => {
-      const current = pi.getThinkingLevel();
-      if (current !== lastThinkingLevel) {
-        lastThinkingLevel = current;
+  const thinkingPoller = {
+    timer: undefined as ReturnType<typeof setInterval> | undefined,
+    last: "",
+    start() {
+      if (this.timer !== undefined) return;
+      this.last = pi.getThinkingLevel();
+      this.timer = setInterval(() => {
+        const current = pi.getThinkingLevel();
+        if (current === this.last) return;
+        this.last = current;
         widget?.update();
-      }
-    }, 150);
-  }
-
-  function stopThinkingPoll() {
-    if (thinkingPollTimer !== undefined) {
-      clearInterval(thinkingPollTimer);
-      thinkingPollTimer = undefined;
-    }
-  }
+      }, 150);
+    },
+    stop() {
+      if (this.timer === undefined) return;
+      clearInterval(this.timer);
+      this.timer = undefined;
+    },
+  };
 
   pi.on("session_start", (_, ctx: ExtensionContext) => {
     ctx.ui.setFooter(() => ({ render: () => [], invalidate() {} }));
     savedCtx = ctx;
     widget = ctx.model ? new StatusWidget(pi, ctx, ctx.model) : undefined;
     widget?.update();
-    startThinkingPoll();
+    thinkingPoller.start();
   });
 
   pi.on("session_shutdown", () => {
-    stopThinkingPoll();
+    thinkingPoller.stop();
   });
 
-  // BUG FIX: create widget if it doesn't exist yet (model wasn't set at session_start)
   pi.on("model_select", (event) => {
     if (widget) {
       widget.model = event.model;
-      widget.update();
     } else if (savedCtx) {
       widget = new StatusWidget(pi, savedCtx, event.model);
-      widget.update();
     }
+    widget?.update();
   });
 
   pi.on("tool_execution_start", (event) => {

@@ -2,40 +2,31 @@ import { execSync } from "node:child_process";
 
 const GIT_OPTS = { encoding: "utf8" as const };
 
-/** Cached git branch tracker — re-checks every N ms. */
-export class GitBranchTracker {
-  private cached = "no-git";
-  private lastCheck = 0;
-  private readonly ttlMs = 3000;
-
-  get(): string {
-    const now = Date.now();
-    if (now - this.lastCheck < this.ttlMs) return this.cached;
-    this.lastCheck = now;
-    try {
-      this.cached = execSync("git rev-parse --abbrev-ref HEAD", GIT_OPTS).trim();
-    } catch {
-      this.cached = "no-git";
-    }
-    return this.cached;
-  }
+function cachedGit(
+  command: string,
+  ttlMs: number,
+  initial: string,
+  transform: (raw: string) => string,
+): { get(): string } {
+  let cached = initial;
+  let lastCheck = 0;
+  return {
+    get() {
+      const now = Date.now();
+      if (now - lastCheck < ttlMs) return cached;
+      lastCheck = now;
+      try {
+        cached = transform(execSync(command, GIT_OPTS).trim());
+      } catch {
+        cached = initial;
+      }
+      return cached;
+    },
+  };
 }
 
-/** Cached git dirty tracker — re-checks every N ms. */
-export class GitDirtyTracker {
-  private cached = "";
-  private lastCheck = 0;
-  private readonly ttlMs = 1500;
+export const createBranchTracker = () =>
+  cachedGit("git rev-parse --abbrev-ref HEAD", 3_000, "no-git", (s) => s);
 
-  get(): string {
-    const now = Date.now();
-    if (now - this.lastCheck < this.ttlMs) return this.cached;
-    this.lastCheck = now;
-    try {
-      this.cached = execSync("git status --porcelain", GIT_OPTS).trim() ? "*" : "";
-    } catch {
-      this.cached = "";
-    }
-    return this.cached;
-  }
-}
+export const createDirtyTracker = () =>
+  cachedGit("git status --porcelain", 1_500, "", (s) => (s ? "*" : ""));
