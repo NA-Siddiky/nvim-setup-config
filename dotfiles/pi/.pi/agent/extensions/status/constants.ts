@@ -7,6 +7,7 @@ export const MODELS: Record<string, string> = {
   "claude-haiku-4-5": "Haiku 4.5",
   "gpt-5.5": "GPT 5.5",
   "gemini-3.1-flash-lite-preview": "Gemini 3.1 (FL)",
+  "qwen-3-235b-a22b-instruct-2507": "Qwen 3.235b (A22B)",
 };
 
 export const PROVIDERS: Record<string, Provider> = {
@@ -28,12 +29,22 @@ export const PROVIDERS: Record<string, Provider> = {
     color: "\x1b[38;5;109m", // gruvbox aqua-blue
   },
 
+  google: {
+    name: "Google",
+    icon: "󰊭", // sparkle / gemini style
+    color: "\x1b[38;5;109m", // gruvbox aqua-blue
+  },
   ollama: {
     name: "Ollama",
     icon: "󰳆", // llama/alpaca-ish
     color: "\x1b[38;5;108m", // muted cyan-green
   },
 
+  cerebras: {
+    name: "Cerebras",
+    icon: "󰳆", // llama/alpaca-ish
+    color: "\x1b[38;5;108m", // muted cyan-green
+  },
   "github-copilot": {
     name: "Copilot",
     icon: "󰊤", // github/octocat-ish

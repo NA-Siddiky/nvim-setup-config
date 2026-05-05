@@ -31,16 +31,15 @@ interface InputState {
   id: string;
   sessionId: string;
   startedAt: number;
-  startTokens: number;
   provider: string;
   modelId: string;
-  // #1: separate input/output cost rates for accurate cost tracking
-  costConfig: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
   tools: Map<string, number>;
   commands: Map<string, number>;
   skills: Map<string, number>;
-  inputTokens: number;
-  outputTokens: number;
+  /** Running total tokens from the last assistant turn (pi's Usage.totalTokens). */
+  totalTokens: number;
+  /** Accumulated cost across all assistant turns (pi's Usage.cost.total, includes cache). */
+  costAccumulated: number;
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
@@ -110,19 +109,13 @@ export default function (pi: ExtensionAPI) {
       id: randomUUID(),
       sessionId: session.id,
       startedAt: Date.now(),
-      inputTokens: 0,
-      outputTokens: 0,
       provider: model?.provider ?? "unknown",
       modelId: model?.id ?? "unknown",
-      costConfig: {
-        input: model?.cost.input ?? 0,
-        output: model?.cost.output ?? 0,
-        cacheRead: model?.cost.cacheRead ?? 0,
-        cacheWrite: model?.cost.cacheWrite ?? 0,
-      },
       tools: new Map(),
       commands,
       skills,
+      totalTokens: 0,
+      costAccumulated: 0,
     };
 
     createInputRecord({
@@ -136,10 +129,16 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("message_end", (event) => {
     if (event.message.role === "assistant" && currentInput) {
-      const usage = (event.message as any).usage;
+      // Usage fields per @mariozechner/pi-ai Usage type:
+      //   input, output, cacheRead, cacheWrite, totalTokens, cost.total
+      const usage = (event.message as { usage?: { totalTokens: number; cost: { total: number } } }).usage;
       if (usage) {
-        currentInput.inputTokens = (usage.input_tokens || usage.input) ?? 0;
-        currentInput.outputTokens = (usage.output_tokens || usage.output) ?? 0;
+        // Take the last turn's totalTokens — it reflects the current context window state,
+        // consistent with how session.tokens is tracked via ctx.getContextUsage().
+        currentInput.totalTokens = usage.totalTokens;
+        // Accumulate cost across every assistant turn so multi-turn inputs are fully counted.
+        // usage.cost.total is computed by pi and already includes cacheRead/cacheWrite costs.
+        currentInput.costAccumulated += usage.cost.total;
       }
     }
   });
@@ -162,14 +161,11 @@ export default function (pi: ExtensionAPI) {
     const endedAt = Date.now();
     const timeMs = endedAt - currentInput.startedAt;
 
-    const costUsd =
-      (currentInput.inputTokens / 1_000_000) * currentInput.costConfig.input +
-      (currentInput.outputTokens / 1_000_000) * currentInput.costConfig.output;
-
     finalizeInputRecord(
-      currentInput.id, endedAt, timeMs, currentInput.inputTokens + currentInput.outputTokens,
+      currentInput.id, endedAt, timeMs,
+      currentInput.totalTokens,       // last turn's totalTokens = current context size
       currentInput.tools, currentInput.commands, currentInput.skills,
-      costUsd,
+      currentInput.costAccumulated,   // sum of all turns' cost.total (cache-inclusive)
     );
     currentInput = null;
   });
