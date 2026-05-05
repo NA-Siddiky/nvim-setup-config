@@ -8,6 +8,7 @@ source $ZSH/oh-my-zsh.sh
 
 # aliases
 alias vm="NVIM_APPNAME=nvim.12 nvim"
+alias vi="NVIM_APPNAME=nvim-chad nvim"
 alias v="nvim"
 alias a="pi"
 alias zc="vi ~/.zshrc"
@@ -20,7 +21,7 @@ alias wick="~/Documents/Coding/Projects/setthemacup/scripts/wick.sh"
 alias dev="~/Documents/Coding/Projects/setthemacup/scripts/dev.sh"
 alias pokemon-bg="~/Documents/Coding/Projects/setthemacup/scripts/pokemon-bg.sh"
 
-alias gp="git config user.name \"mahi160\" && git config user.email \"omarsifat288@gamil.com\""
+alias gp="git config user.name \"mahi160\" && git config user.email \"omarsifat288@gmail.com\""
 alias gw="git config user.name \"salauddin-sifat-qp\" && git config user.email \"salauddin.sifat@questionpro.com\""
 
 # Alt+Q: change Pokemon background from anywhere in the terminal
@@ -68,3 +69,6 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Vite+ bin (https://viteplus.dev)
 . "$HOME/.vite-plus/env"
+export PATH="$HOME/.local/bin:$PATH"
+
+source "$HOME/.cargo/env"
