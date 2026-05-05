@@ -32,6 +32,14 @@
       "rev": "6cd7280adead7f586db6fccbd15d2cac7e2188b9",
       "src": "https://github.com/rafamadriz/friendly-snippets"
     },
+    "fzf-lua": {
+      "rev": "cf4c30892644f01ebfb1e248eeca9e259856f9dc",
+      "src": "https://github.com/ibhagwan/fzf-lua"
+    },
+    "grug-far.nvim": {
+      "rev": "21790e59dd0109a92a70cb874dd002af186314f5",
+      "src": "https://github.com/MagicDuck/grug-far.nvim"
+    },
     "gruvbox-material": {
       "rev": "11d779b26a9ab2b3db8c22c6ac9fb6e8ed4fea79",
       "src": "https://github.com/sainnhe/gruvbox-material"
@@ -71,6 +79,10 @@
     "nvim-ts-autotag": {
       "rev": "88c1453db4ba7dd24131086fe51fdf74e587d275",
       "src": "https://github.com/windwp/nvim-ts-autotag"
+    },
+    "nvim-web-devicons": {
+      "rev": "4fc505ac7bd7692824a142e96e5f529c133862f8",
+      "src": "https://github.com/nvim-tree/nvim-web-devicons"
     },
     "oil.nvim": {
       "rev": "0fcc83805ad11cf714a949c98c605ed717e0b83e",
@@ -119,6 +131,22 @@
     "todo-comments.nvim": {
       "rev": "31e3c38ce9b29781e4422fc0322eb0a21f4e8668",
       "src": "https://github.com/folke/todo-comments.nvim"
+    },
+    "trouble.nvim": {
+      "rev": "bd67efe408d4816e25e8491cc5ad4088e708a69a",
+      "src": "https://github.com/folke/trouble.nvim"
+    },
+    "vim-dadbod": {
+      "rev": "6d1d41da4873a445c5605f2005ad2c68c99d8770",
+      "src": "https://github.com/tpope/vim-dadbod"
+    },
+    "vim-dadbod-completion": {
+      "rev": "a8dac0b3cf6132c80dc9b18bef36d4cf7a9e1fe6",
+      "src": "https://github.com/kristijanhusak/vim-dadbod-completion"
+    },
+    "vim-dadbod-ui": {
+      "rev": "07e92e22114cc5b1ba4938d99897d85b58e20475",
+      "src": "https://github.com/kristijanhusak/vim-dadbod-ui"
     },
     "vim-wakatime": {
       "rev": "5f458398a217735b908ae40d1c2851cc69e7d817",

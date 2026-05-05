@@ -8,20 +8,17 @@ vim.pack.add({
 require("blink.cmp").build():wait(60000)
 
 require("blink.cmp").setup({
-	fuzzy      = { implementation = "rust" },
-	snippets   = { preset = "mini_snippets" },
+	fuzzy = { implementation = "rust" },
+	snippets = { preset = "mini_snippets" },
 	keymap = {
-		preset      = "default",
-		["<CR>"]    = { "accept", "fallback" },
-		["<Tab>"]   = { "snippet_forward", "fallback" },  -- Tab → supermaven
-		["<S-Tab>"] = { "snippet_backward", "fallback" },
+		preset = "default",
 	},
-	sources    = { default = { "lsp", "path", "snippets", "buffer" } },
+	sources = { default = { "lsp", "path", "snippets", "buffer" } },
 	appearance = { use_nvim_cmp_as_default = false, nerd_font_variant = "mono" },
-	signature  = { enabled = true },
+	signature = { enabled = true },
 	completion = {
 		documentation = { auto_show = true, auto_show_delay_ms = 150 },
-		ghost_text    = { enabled = false },
+		ghost_text = { enabled = false },
 		menu = {
 			auto_show = true,
 			auto_show_delay_ms = 180,

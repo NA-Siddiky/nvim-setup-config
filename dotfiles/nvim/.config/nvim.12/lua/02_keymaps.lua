@@ -13,21 +13,18 @@ map("n", "<C-j>", "<C-w>j", o("Focus down"))
 map("n", "<C-k>", "<C-w>k", o("Focus up"))
 map("n", "<C-l>", "<C-w>l", o("Focus right"))
 
-map("n", "<S-h>", "<cmd>bprevious<CR>", o("Prev buffer"))
-map("n", "<S-l>", "<cmd>bnext<CR>", o("Next buffer"))
-map("n", "<S-j>", "<cmd>b#<CR>", o("Last buffer"))
-
 map({ "n", "v" }, "<leader>y", '"+y', o("Yank to clipboard"))
 map({ "n", "v" }, "<leader>p", '"+p', o("Paste from clipboard"))
 map({ "n", "v" }, "<leader>P", '"+P', o("Paste from clipboard (before)"))
 
--- Undotree
 map("n", "<leader>u", "<cmd>UndotreeToggle<CR>", o("Toggle undotree"))
 
--- Splits (like lazyvim)
 map("n", "<leader>|", "<cmd>vsplit<CR>", o("Split vertically"))
 map("n", "<leader>-", "<cmd>split<CR>", o("Split horizontally"))
 
+map("n", "<S-h>", "<cmd>bprevious<CR>", o("Prev buffer"))
+map("n", "<S-l>", "<cmd>bnext<CR>", o("Next buffer"))
+map("n", "<S-j>", "<cmd>b#<CR>", o("Last buffer"))
 map("n", "<leader>bo", function()
 	local cur = vim.fn.bufnr()
 	for _, buf in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do
