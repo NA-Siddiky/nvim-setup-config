@@ -26,8 +26,10 @@ vim.o.pumheight = 10
 vim.o.tabstop = 2
 vim.o.shiftwidth = 2
 vim.o.expandtab = true
-
 vim.o.keywordprg = ":help!"
-
+vim.o.foldmethod = "expr"
+vim.o.foldexpr = "v:lua.vim.lsp.foldexpr()"
+vim.o.foldlevel = 99
+vim.o.foldlevelstart = 99
 vim.o.spelllang = "en"
 vim.o.spellfile = vim.fn.stdpath("config") .. "/spell/en.utf-8.add"

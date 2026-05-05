@@ -4,12 +4,12 @@ require("mini.extra").setup()
 require("mini.ai").setup({
 	custom_textobjects = {
 		f = require("mini.ai").gen_spec.treesitter({ a = "@function.outer", i = "@function.inner" }),
-		c = require("mini.ai").gen_spec.treesitter({ a = "@class.outer",    i = "@class.inner" }),
+		c = require("mini.ai").gen_spec.treesitter({ a = "@class.outer", i = "@class.inner" }),
 		o = require("mini.ai").gen_spec.treesitter({ a = "@conditional.outer", i = "@conditional.inner" }),
-		l = require("mini.ai").gen_spec.treesitter({ a = "@loop.outer",     i = "@loop.inner" }),
+		l = require("mini.ai").gen_spec.treesitter({ a = "@loop.outer", i = "@loop.inner" }),
 		a = require("mini.ai").gen_spec.treesitter({ a = "@parameter.outer", i = "@parameter.inner" }),
-		b = require("mini.ai").gen_spec.treesitter({ a = "@block.outer",    i = "@block.inner" }),
-		C = require("mini.ai").gen_spec.treesitter({ a = "@comment.outer",  i = "@comment.inner" }),
+		b = require("mini.ai").gen_spec.treesitter({ a = "@block.outer", i = "@block.inner" }),
+		C = require("mini.ai").gen_spec.treesitter({ a = "@comment.outer", i = "@comment.inner" }),
 	},
 })
 
@@ -31,3 +31,4 @@ require("mini.statusline").setup()
 require("mini.surround").setup()
 require("mini.tabline").setup()
 require("mini.trailspace").setup()
+require("mini.bufremove").setup()

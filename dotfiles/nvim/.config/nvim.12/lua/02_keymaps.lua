@@ -23,7 +23,7 @@ map({ "n", "v" }, "<leader>y", '"+y', o("Yank to clipboard"))
 map({ "n", "v" }, "<leader>p", '"+p', o("Paste from clipboard"))
 map({ "n", "v" }, "<leader>P", '"+P', o("Paste from clipboard (before)"))
 
-map("n", "<leader>u", "<cmd>UndotreeToggle<CR>", o("Toggle undotree"))
+map("n", "<leader>tu", "<cmd>UndotreeToggle<CR>", o("Toggle undotree"))
 
 map("n", "<leader>|", "<cmd>vsplit<CR>", o("Split vertically"))
 map("n", "<leader>-", "<cmd>split<CR>", o("Split horizontally"))
@@ -31,12 +31,15 @@ map("n", "<leader>-", "<cmd>split<CR>", o("Split horizontally"))
 map("n", "<S-h>", "<cmd>bprevious<CR>", o("Prev buffer"))
 map("n", "<S-l>", "<cmd>bnext<CR>", o("Next buffer"))
 map("n", "<S-j>", "<cmd>b#<CR>", o("Last buffer"))
+
 map("n", "<C-d>", "<C-d>zz", o("Scroll down centered"))
 map("n", "<C-u>", "<C-u>zz", o("Scroll up centered"))
 map("n", "n", "nzzzv", o("Next match centered"))
 map("n", "N", "Nzzzv", o("Prev match centered"))
 
-map("n", "<leader>bd", "<cmd>bdelete<CR>", o("Delete buffer"))
+map("n", "<leader>bd", function()
+	MiniBufremove.delete()
+end, o("Delete buffer"))
 map("n", "<leader>bo", function()
 	local cur = vim.fn.bufnr()
 	for _, buf in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do

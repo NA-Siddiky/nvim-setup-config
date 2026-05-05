@@ -26,6 +26,7 @@ require("tiny-inline-diagnostic").setup({ preset = "ghost" })
 
 -- virtual swatch style (■ colored block inline before the value)
 vim.lsp.document_color.enable(true, nil, { style = "virtual" })
+vim.lsp.linked_editing_range.enable()
 
 require("mason").setup()
 require("mason-lspconfig").setup()
@@ -48,10 +49,10 @@ require("mason-tool-installer").setup({
 		"oxlint",
 		"oxfmt",
 		"stylua",
+		"shfmt",
 		"gofumpt",
 		"goimports",
 		"black",
-		"shfmt",
 		"pylint",
 		"isort",
 		"stylelint",
@@ -117,7 +118,6 @@ for name, config in pairs(servers) do
 	vim.lsp.enable(name)
 end
 
--- nvim 0.12 already maps: K grn gra grr gri grt gO grx ]d [d <C-W>d <C-S>
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp_maps", { clear = true }),
 	callback = function(ev)
@@ -125,14 +125,17 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			vim.keymap.set("n", lhs, rhs, { buffer = ev.buf, silent = true, desc = desc })
 		end
 
-		-- harper: writes word to shared spellfile via code action
-		map("<leader>ha", function()
-			vim.lsp.buf.code_action({
-				filter = function(a)
-					return a.title:lower():match("add.+dict") ~= nil or a.title:lower():match("ignore") ~= nil
-				end,
-				apply = true,
-			})
-		end, "Add word to dictionary")
+		map("<leader>ti", function()
+			vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = ev.buf }), { bufnr = ev.buf })
+		end, "Toggle inlay hints")
+	end,
+})
+
+vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
+	group = vim.api.nvim_create_augroup("codelens", { clear = true }),
+	callback = function(ev)
+		if #vim.lsp.get_clients({ bufnr = ev.buf }) > 0 then
+			vim.lsp.codelens.enable(true, { bufnr = ev.buf })
+		end
 	end,
 })

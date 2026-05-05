@@ -22,19 +22,20 @@ clue.setup({
 		clue.gen_clues.z(),
 		-- group hints (all in one place)
 		{ mode = "n", keys = "gr",         desc = "+lsp" },
+		{ mode = "n", keys = "gR",         desc = "+replace" },
+		{ mode = "n", keys = "<leader>t", desc = "+toggle" },
 		{ mode = "n", keys = "<leader>b", desc = "+buffer" },
 		{ mode = "n", keys = "<leader>d", desc = "+database" },
 		{ mode = "n", keys = "<leader>g", desc = "+git" },
-		{ mode = "n", keys = "<leader>h", desc = "+harper" },
 		{ mode = "n", keys = "<leader>l", desc = "+live-preview" },
-		{ mode = "n", keys = "<leader>m", desc = "+map" },
 		{ mode = "n", keys = "<leader>q", desc = "+quit" },
-		{ mode = "n", keys = "<leader>r", desc = "+replace" },
 		{ mode = "n", keys = "<leader>s", desc = "+search" },
 		{ mode = "n", keys = "<leader>x", desc = "+quickfix" },
 		{ mode = "n", keys = "<leader>?", desc = "cheatsheet" },
 	},
 })
+
+vim.ui.select = MiniPick.ui_select
 
 -- ── mini.map ──────────────────────────────────────────────────────────────────
 local minimap = require("mini.map")
@@ -45,7 +46,7 @@ minimap.setup({
 		minimap.gen_integration.diff(),
 	},
 })
-vim.keymap.set("n", "<leader>mm", MiniMap.toggle, { silent = true, desc = "Toggle minimap" })
+vim.keymap.set("n", "<leader>tm", MiniMap.toggle, { silent = true, desc = "Toggle minimap" })
 
 -- ── mini.git keymaps ──────────────────────────────────────────────────────────
 vim.keymap.set({ "n", "x" }, "<leader>gh", function()

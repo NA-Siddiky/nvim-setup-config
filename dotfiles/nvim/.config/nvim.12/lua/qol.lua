@@ -25,5 +25,5 @@ require("smear_cursor").setup({
 require("todo-comments").setup({})
 require("render-markdown").setup({})
 
-vim.keymap.set("n", "<leader>lp", "<cmd>LivePreview start<CR>", { silent = true, desc = "Start live preview" })
-vim.keymap.set("n", "<leader>lx", "<cmd>LivePreview close<CR>", { silent = true, desc = "Close live preview" })
+vim.keymap.set("n", "<leader>lo", "<cmd>LivePreview start<CR>", { silent = true, desc = "Open live preview" })
+vim.keymap.set("n", "<leader>lc", "<cmd>LivePreview close<CR>", { silent = true, desc = "Close live preview" })

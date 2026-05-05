@@ -13,7 +13,7 @@ Quit everything at once with `<leader>qq`.
 `<C-d>` and `<C-u>` scroll half a page and keep the cursor centered. `n` and `N`
 jump between search matches, also centered. Press `-` anywhere to open the
 parent directory in oil.nvim — edit it like a buffer, save to apply changes.
-`<leader>u` opens the undo tree so you can travel through history visually.
+`<leader>tu` opens the undo tree so you can travel through history visually.
 
 ## Search — mini.pick
 
@@ -31,12 +31,13 @@ picker to toggle a file preview.
 nvim 0.12 DWIM help: it looks at the word under the cursor, strips punctuation, and
 opens the closest matching help tag automatically. Great for exploring Lua APIs inline. Rename a symbol with `grn`, trigger a code action with
 `gra`, list references with `grr`, jump to implementation with `gri`, and go to
-the type definition with `grt`. `gO` shows the document symbol outline. Navigate
-diagnostics with `]d` / `[d`, or open the diagnostic float with `<C-W>d`.
-`<leader>ha` runs the harper code action to add a word to your personal dictionary.
-In CSS/HTML/Svelte files, LSP color values get a colored `■` swatch inline. Place
-the cursor on a color and press `<leader>cp` to open a picker of alternate formats
-(hex, rgb, hsl, etc.) and apply one in place.
+the type definition with `grt`, and run codelens with `grx`. `gO` shows the
+document symbol outline. Navigate diagnostics with `]d` / `[d`, or open the
+diagnostic float with `<C-W>d`.
+In CSS/HTML/Svelte files, LSP color values get a colored `■` swatch inline.
+Linked editing keeps paired tags in sync when the server supports it. Harper
+grammar hints appear as diagnostics — use `gra` to add a word to your personal
+dictionary via code action.
 
 ## Git — mini.git
 
@@ -73,7 +74,8 @@ loclist use `]l` / `[l`. Linting results land here automatically on save.
 
 ## Misc
 
-`<leader>mm` toggles the minimap (shows search, diagnostics, and diff in the
-gutter). `<leader>du` opens the database UI. `<leader>lp` / `<leader>lx` starts
-and stops the live HTML preview. Press `<Esc>` in normal mode to clear search
+`<leader>tm` toggles the minimap, `<leader>tu` the undo tree, and `<leader>ti`
+inlay hints. `<leader>du` opens the database UI.
+`<leader>lo` / `<leader>lc` starts and stops the live HTML preview.
+`<leader>r` opens find & replace (grug-far). Press `<Esc>` to clear search
 highlights. `jj` exits insert mode. Open this file anytime with `<leader>?`.
