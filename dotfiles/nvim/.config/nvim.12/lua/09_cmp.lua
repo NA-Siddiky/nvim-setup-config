@@ -1,0 +1,66 @@
+vim.pack.add({
+	"https://github.com/rafamadriz/friendly-snippets",
+	"https://github.com/saghen/blink.lib",
+	"https://github.com/saghen/blink.cmp",
+	"https://github.com/supermaven-inc/supermaven-nvim",
+})
+
+require("blink.cmp").build():wait(60000)
+
+require("blink.cmp").setup({
+	fuzzy = {
+		implementation = "rust",
+	},
+
+	-- delegate snippet expand/jump to mini.snippets
+	snippets = {
+		preset = "mini_snippets",
+	},
+
+	keymap = {
+		preset = "default",
+		["<CR>"] = { "accept", "fallback" },
+	},
+
+	sources = {
+		default = { "lsp", "path", "snippets", "buffer" },
+	},
+
+	appearance = {
+		use_nvim_cmp_as_default = false,
+		nerd_font_variant = "mono",
+	},
+
+	signature = {
+		enabled = true,
+	},
+
+	completion = {
+		documentation = {
+			auto_show = true,
+			auto_show_delay_ms = 150,
+		},
+
+		ghost_text = {
+			enabled = false,
+		},
+
+		menu = {
+			auto_show = true,
+			auto_show_delay_ms = 180,
+			draw = {
+				treesitter = { "lsp" },
+				columns = {
+					{ "kind_icon", "label", "label_description", gap = 1 },
+					{ "kind" },
+				},
+			},
+		},
+	},
+})
+
+require("supermaven-nvim").setup({
+	keymaps = {
+		accept_suggestion = nil,
+	},
+})
