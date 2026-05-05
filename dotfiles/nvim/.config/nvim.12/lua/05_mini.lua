@@ -34,6 +34,16 @@ require("mini.surround").setup()
 require("mini.tabline").setup()
 require("mini.trailspace").setup()
 
+local minimap = require("mini.map")
+minimap.setup({
+	integrations = {
+		minimap.gen_integration.builtin_search(),
+		minimap.gen_integration.diagnostic(),
+		minimap.gen_integration.diff(),
+	},
+})
+vim.keymap.set("n", "<leader>mm", MiniMap.toggle, { silent = true, desc = "Toggle minimap" })
+
 vim.keymap.set({ "n", "x" }, "<leader>gh", function()
 	MiniGit.show_at_cursor()
 end, { desc = "Show git history" })
@@ -61,8 +71,14 @@ clue.setup({
 		clue.gen_clues.registers(),
 		clue.gen_clues.windows(),
 		clue.gen_clues.z(),
+		{ mode = "n", keys = "<leader>b", desc = "+buffer" },
 		{ mode = "n", keys = "<leader>f", desc = "+find" },
 		{ mode = "n", keys = "<leader>g", desc = "+git" },
+		{ mode = "n", keys = "<leader>h", desc = "+harper" },
+		{ mode = "n", keys = "<leader>l", desc = "+live-preview" },
+		{ mode = "n", keys = "<leader>m", desc = "+map" },
 		{ mode = "n", keys = "<leader>q", desc = "+quit" },
+		{ mode = "n", keys = "<leader>s", desc = "+search" },
+		{ mode = "n", keys = "<leader>x", desc = "+quickfix" },
 	},
 })

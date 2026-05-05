@@ -7,16 +7,16 @@ vim.pack.add({
 })
 
 vim.diagnostic.config({
-	virtual_text     = false,
+	virtual_text = false,
 	update_in_insert = false,
-	severity_sort    = true,
-	underline        = true,
+	severity_sort = true,
+	underline = true,
 	signs = {
 		text = {
 			[vim.diagnostic.severity.ERROR] = " ",
-			[vim.diagnostic.severity.WARN]  = " ",
-			[vim.diagnostic.severity.INFO]  = " ",
-			[vim.diagnostic.severity.HINT]  = " ",
+			[vim.diagnostic.severity.WARN] = " ",
+			[vim.diagnostic.severity.INFO] = " ",
+			[vim.diagnostic.severity.HINT] = " ",
 		},
 	},
 	float = { border = "rounded", source = "if_many", focusable = false },
@@ -28,10 +28,30 @@ require("mason").setup()
 require("mason-lspconfig").setup()
 require("mason-tool-installer").setup({
 	ensure_installed = {
-		"lua_ls", "vtsls", "svelte", "tailwindcss", "html", "cssls",
-		"gopls", "pyright", "bashls", "harper_ls", "sqls", "emmet-language-server",
-		"prettier", "eslint_d", "oxlint", "oxfmt",
-		"stylua", "gofumpt", "goimports", "black", "shfmt",
+		"lua_ls",
+		"vtsls",
+		"svelte",
+		"tailwindcss",
+		"html",
+		"cssls",
+		"gopls",
+		"pyright",
+		"bashls",
+		"harper_ls",
+		"sqls",
+		"emmet-language-server",
+		"prettier",
+		"eslint_d",
+		"oxlint",
+		"oxfmt",
+		"stylua",
+		"gofumpt",
+		"goimports",
+		"black",
+		"shfmt",
+		"pylint",
+		"isort",
+		"stylelint",
 	},
 })
 
@@ -42,19 +62,35 @@ local servers = {
 		settings = {
 			Lua = {
 				diagnostics = { globals = { "vim" } },
-				workspace   = { checkThirdParty = false },
-				telemetry   = { enable = false },
+				workspace = { checkThirdParty = false },
+				telemetry = { enable = false },
 			},
 		},
 	},
 	vtsls = {
 		settings = {
-			typescript  = { preferences = { importModuleSpecifier = "relative" } },
-			javascript  = { preferences = { importModuleSpecifier = "relative" } },
+			typescript = { preferences = { importModuleSpecifier = "relative" } },
+			javascript = { preferences = { importModuleSpecifier = "relative" } },
 		},
 	},
-	svelte = {}, tailwindcss = {}, html = {}, cssls = {}, sqls = {},
-	pyright = {}, bashls = {}, oxfmt = {}, oxlint = {},
+	svelte = {},
+	tailwindcss = {},
+	html = {},
+	cssls = {
+		settings = {
+			css = {
+				validate = true,
+				lint = {
+					unknownAtRules = "ignore",
+				},
+			},
+		},
+	},
+	sqls = {},
+	pyright = {},
+	bashls = {},
+	oxfmt = {},
+	oxlint = {},
 	emmet_language_server = {
 		filetypes = { "html", "css", "javascriptreact", "typescriptreact", "svelte" },
 	},
@@ -66,9 +102,9 @@ local servers = {
 	harper_ls = {
 		settings = {
 			["harper-ls"] = {
-				userDictPath       = vim.fn.stdpath("config") .. "/spell/en.utf-8.add",
+				userDictPath = vim.fn.stdpath("config") .. "/spell/en.utf-8.add",
 				diagnosticSeverity = "hint",
-				codeActions        = true,
+				codeActions = true,
 			},
 		},
 	},
@@ -82,7 +118,7 @@ end
 
 -- nvim 0.12 already maps: K grn gra grr gri grt gO grx ]d [d <C-W>d <C-S>
 vim.api.nvim_create_autocmd("LspAttach", {
-	group    = vim.api.nvim_create_augroup("lsp_maps", { clear = true }),
+	group = vim.api.nvim_create_augroup("lsp_maps", { clear = true }),
 	callback = function(ev)
 		local function map(lhs, rhs, desc)
 			vim.keymap.set("n", lhs, rhs, { buffer = ev.buf, silent = true, desc = desc })
@@ -94,8 +130,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		map("<leader>ha", function()
 			vim.lsp.buf.code_action({
 				filter = function(a)
-					return a.title:lower():match("add.+dict") ~= nil
-						or a.title:lower():match("ignore") ~= nil
+					return a.title:lower():match("add.+dict") ~= nil or a.title:lower():match("ignore") ~= nil
 				end,
 				apply = true,
 			})

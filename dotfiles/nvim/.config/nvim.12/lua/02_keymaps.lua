@@ -21,6 +21,13 @@ map({ "n", "v" }, "<leader>y", '"+y', o("Yank to clipboard"))
 map({ "n", "v" }, "<leader>p", '"+p', o("Paste from clipboard"))
 map({ "n", "v" }, "<leader>P", '"+P', o("Paste from clipboard (before)"))
 
+-- Undotree
+map("n", "<leader>u", "<cmd>UndotreeToggle<CR>", o("Toggle undotree"))
+
+-- Splits (like lazyvim)
+map("n", "<leader>|", "<cmd>vsplit<CR>", o("Split vertically"))
+map("n", "<leader>-", "<cmd>split<CR>", o("Split horizontally"))
+
 map("n", "<leader>bo", function()
 	local cur = vim.fn.bufnr()
 	for _, buf in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do

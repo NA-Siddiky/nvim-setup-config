@@ -10,7 +10,12 @@ require("blink.cmp").build():wait(60000)
 require("blink.cmp").setup({
 	fuzzy      = { implementation = "rust" },
 	snippets   = { preset = "mini_snippets" },
-	keymap     = { preset = "default", ["<CR>"] = { "accept", "fallback" } },
+	keymap = {
+		preset      = "default",
+		["<CR>"]    = { "accept", "fallback" },
+		["<Tab>"]   = { "snippet_forward", "fallback" },  -- Tab → supermaven
+		["<S-Tab>"] = { "snippet_backward", "fallback" },
+	},
 	sources    = { default = { "lsp", "path", "snippets", "buffer" } },
 	appearance = { use_nvim_cmp_as_default = false, nerd_font_variant = "mono" },
 	signature  = { enabled = true },
@@ -31,4 +36,4 @@ require("blink.cmp").setup({
 	},
 })
 
-require("supermaven-nvim").setup({ keymaps = { accept_suggestion = nil } })
+require("supermaven-nvim").setup({ keymaps = { accept_suggestion = "<Tab>" } })
