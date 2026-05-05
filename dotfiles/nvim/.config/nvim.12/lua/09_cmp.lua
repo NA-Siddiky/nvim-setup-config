@@ -8,43 +8,15 @@ vim.pack.add({
 require("blink.cmp").build():wait(60000)
 
 require("blink.cmp").setup({
-	fuzzy = {
-		implementation = "rust",
-	},
-
-	-- delegate snippet expand/jump to mini.snippets
-	snippets = {
-		preset = "mini_snippets",
-	},
-
-	keymap = {
-		preset = "default",
-		["<CR>"] = { "accept", "fallback" },
-	},
-
-	sources = {
-		default = { "lsp", "path", "snippets", "buffer" },
-	},
-
-	appearance = {
-		use_nvim_cmp_as_default = false,
-		nerd_font_variant = "mono",
-	},
-
-	signature = {
-		enabled = true,
-	},
-
+	fuzzy      = { implementation = "rust" },
+	snippets   = { preset = "mini_snippets" },
+	keymap     = { preset = "default", ["<CR>"] = { "accept", "fallback" } },
+	sources    = { default = { "lsp", "path", "snippets", "buffer" } },
+	appearance = { use_nvim_cmp_as_default = false, nerd_font_variant = "mono" },
+	signature  = { enabled = true },
 	completion = {
-		documentation = {
-			auto_show = true,
-			auto_show_delay_ms = 150,
-		},
-
-		ghost_text = {
-			enabled = false,
-		},
-
+		documentation = { auto_show = true, auto_show_delay_ms = 150 },
+		ghost_text    = { enabled = false },
 		menu = {
 			auto_show = true,
 			auto_show_delay_ms = 180,
@@ -59,8 +31,4 @@ require("blink.cmp").setup({
 	},
 })
 
-require("supermaven-nvim").setup({
-	keymaps = {
-		accept_suggestion = nil,
-	},
-})
+require("supermaven-nvim").setup({ keymaps = { accept_suggestion = nil } })

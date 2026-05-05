@@ -1,6 +1,5 @@
 vim.pack.add({ "https://github.com/echasnovski/mini.nvim" })
 
--- text objects with treesitter awareness
 require("mini.ai").setup({
 	custom_textobjects = {
 		f = require("mini.ai").gen_spec.treesitter({ a = "@function.outer", i = "@function.inner" }),
@@ -13,60 +12,34 @@ require("mini.ai").setup({
 	},
 })
 
--- sane defaults (better defaults for common options)
 require("mini.basics").setup()
-
--- gc to toggle comments (treesitter-aware)
 require("mini.comment").setup()
-
--- highlight word under cursor
 require("mini.cursorword").setup()
-
--- diff signs in the gutter
-require("mini.diff").setup({
-	view = { style = "sign" },
-})
-
--- icons + nvim-web-devicons compat shim
+require("mini.cmdline").setup()
+require("mini.diff").setup({ view = { style = "sign" } })
+require("mini.git").setup()
 require("mini.icons").setup()
 require("mini.icons").mock_nvim_web_devicons()
-
--- indent scope indicator
 require("mini.indentscope").setup()
-
--- move lines/selections with Alt+hjkl
 require("mini.move").setup()
 
--- replace vim.notify with styled floating notifications
 require("mini.notify").setup()
 vim.notify = require("mini.notify").make_notify()
 
--- auto-pair brackets/quotes
 require("mini.pairs").setup()
-
--- snippets engine (used by blink.cmp)
-require("mini.snippets").setup({
-	snippets = {
-		require("mini.snippets").gen_loader.from_lang(),
-	},
-})
-
--- gS to split/join function args and arrays
+require("mini.snippets").setup({ snippets = { require("mini.snippets").gen_loader.from_lang() } })
 require("mini.splitjoin").setup()
-
--- statusline
 require("mini.statusline").setup()
-
--- sa/sd/sr — add, delete, replace surrounds
 require("mini.surround").setup()
-
--- tabline
 require("mini.tabline").setup()
-
--- highlight trailing whitespace
 require("mini.trailspace").setup()
 
--- which-key replacement: shows pending keymap popup
+vim.keymap.set({ "n", "x" }, "<leader>gh", function()
+	MiniGit.show_at_cursor()
+end, { desc = "Show git history" })
+vim.keymap.set("n", "<leader>gb", "<cmd>vertical Git blame -- %<CR>", { desc = "Show git blame" })
+vim.keymap.set("n", "<leader>gl", "<cmd>Git log --oneline -- %<CR>", { desc = "Show file git log" })
+
 local clue = require("mini.clue")
 clue.setup({
 	triggers = {
@@ -89,6 +62,7 @@ clue.setup({
 		clue.gen_clues.windows(),
 		clue.gen_clues.z(),
 		{ mode = "n", keys = "<leader>f", desc = "+find" },
+		{ mode = "n", keys = "<leader>g", desc = "+git" },
 		{ mode = "n", keys = "<leader>q", desc = "+quit" },
 	},
 })

@@ -3,6 +3,7 @@ vim.cmd.packadd("nvim.undotree")
 
 vim.g.mapleader = " "
 
+vim.o.undofile = true
 vim.o.number = true
 vim.o.relativenumber = true
 vim.o.signcolumn = "yes"
@@ -18,3 +19,6 @@ vim.o.termguicolors = true
 vim.o.tabstop = 2
 vim.o.shiftwidth = 2
 vim.o.expandtab = true
+
+vim.o.spelllang = "en"
+vim.o.spellfile = vim.fn.stdpath("config") .. "/spell/en.utf-8.add"
