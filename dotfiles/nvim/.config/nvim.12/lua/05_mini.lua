@@ -1,5 +1,7 @@
 vim.pack.add({ "https://github.com/echasnovski/mini.nvim" })
 
+require("mini.extra").setup()
+
 require("mini.ai").setup({
 	custom_textobjects = {
 		f = require("mini.ai").gen_spec.treesitter({ a = "@function.outer", i = "@function.inner" }),

@@ -14,6 +14,7 @@ require("blink.cmp").setup({
 		preset = "default",
 	},
 	sources = { default = { "lsp", "path", "snippets", "buffer" } },
+	cmdline = { enabled = false },
 	appearance = { use_nvim_cmp_as_default = false, nerd_font_variant = "mono" },
 	signature = { enabled = true },
 	completion = {
