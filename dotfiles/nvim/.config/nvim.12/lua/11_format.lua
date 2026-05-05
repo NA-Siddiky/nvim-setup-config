@@ -22,6 +22,8 @@ conform.setup({
 		lua             = { "stylua" },
 		python          = { "isort", "black" },
 		go              = { "goimports", "gofumpt" },
+		sh              = { "shfmt" },
+		bash            = { "shfmt" },
 	},
 	format_on_save = { lsp_format = "fallback", async = false, timeout_ms = 3000 },
 })
@@ -38,7 +40,7 @@ lint.linters_by_ft = {
 	css             = { "stylelint" },
 }
 
-vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "InsertLeave" }, {
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost", "InsertLeave" }, {
 	group    = vim.api.nvim_create_augroup("lint", { clear = true }),
 	callback = function()
 		lint.try_lint(lint.linters_by_ft[vim.bo.filetype])

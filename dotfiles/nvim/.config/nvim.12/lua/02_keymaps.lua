@@ -3,6 +3,12 @@ local function o(desc)
 	return { silent = true, noremap = true, desc = desc }
 end
 
+local cheatsheet = vim.fn.stdpath("config") .. "/CHEATSHEET.md"
+
+map("n", "<leader>?", function()
+	vim.cmd("edit " .. cheatsheet)
+end, o("Open cheatsheet"))
+
 map("i", "jj", "<Esc>", { silent = true, desc = "Exit insert" })
 
 map("n", "<Esc>", "<cmd>nohlsearch<CR>", o("Clear search highlight"))

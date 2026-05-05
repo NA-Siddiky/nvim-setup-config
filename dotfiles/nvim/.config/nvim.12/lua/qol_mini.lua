@@ -21,9 +21,9 @@ clue.setup({
 		clue.gen_clues.windows(),
 		clue.gen_clues.z(),
 		-- group hints (all in one place)
+		{ mode = "n", keys = "gr",         desc = "+lsp" },
 		{ mode = "n", keys = "<leader>b", desc = "+buffer" },
 		{ mode = "n", keys = "<leader>d", desc = "+database" },
-		{ mode = "n", keys = "<leader>f", desc = "+find" },
 		{ mode = "n", keys = "<leader>g", desc = "+git" },
 		{ mode = "n", keys = "<leader>h", desc = "+harper" },
 		{ mode = "n", keys = "<leader>l", desc = "+live-preview" },
@@ -32,6 +32,7 @@ clue.setup({
 		{ mode = "n", keys = "<leader>r", desc = "+replace" },
 		{ mode = "n", keys = "<leader>s", desc = "+search" },
 		{ mode = "n", keys = "<leader>x", desc = "+quickfix" },
+		{ mode = "n", keys = "<leader>?", desc = "cheatsheet" },
 	},
 })
 

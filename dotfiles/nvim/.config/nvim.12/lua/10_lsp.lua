@@ -24,6 +24,9 @@ vim.diagnostic.config({
 
 require("tiny-inline-diagnostic").setup({ preset = "ghost" })
 
+-- virtual swatch style (■ colored block inline before the value)
+vim.lsp.document_color.enable(true, nil, { style = "virtual" })
+
 require("mason").setup()
 require("mason-lspconfig").setup()
 require("mason-tool-installer").setup({
