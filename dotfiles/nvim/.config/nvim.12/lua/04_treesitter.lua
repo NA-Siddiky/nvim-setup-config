@@ -4,9 +4,9 @@ vim.pack.add({
 })
 
 local parsers = {
-	"bash", "css", "go", "html", "javascript", "jsdoc",
-	"json", "lua", "python", "regex", "sql", "svelte", "tsx",
-	"typescript", "yaml",
+	"bash", "css", "dockerfile", "go", "html", "javascript", "jsdoc",
+	"json", "lua", "markdown", "markdown_inline", "python", "regex",
+	"sql", "svelte", "toml", "tsx", "typescript", "vim", "yaml",
 }
 
 require("nvim-treesitter").install(parsers)

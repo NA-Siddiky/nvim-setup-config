@@ -25,6 +25,12 @@ map("n", "<leader>-", "<cmd>split<CR>", o("Split horizontally"))
 map("n", "<S-h>", "<cmd>bprevious<CR>", o("Prev buffer"))
 map("n", "<S-l>", "<cmd>bnext<CR>", o("Next buffer"))
 map("n", "<S-j>", "<cmd>b#<CR>", o("Last buffer"))
+map("n", "<C-d>", "<C-d>zz", o("Scroll down centered"))
+map("n", "<C-u>", "<C-u>zz", o("Scroll up centered"))
+map("n", "n", "nzzzv", o("Next match centered"))
+map("n", "N", "Nzzzv", o("Prev match centered"))
+
+map("n", "<leader>bd", "<cmd>bdelete<CR>", o("Delete buffer"))
 map("n", "<leader>bo", function()
 	local cur = vim.fn.bufnr()
 	for _, buf in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do

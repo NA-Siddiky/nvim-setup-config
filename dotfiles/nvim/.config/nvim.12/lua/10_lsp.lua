@@ -89,8 +89,6 @@ local servers = {
 	sqls = {},
 	pyright = {},
 	bashls = {},
-	oxfmt = {},
-	oxlint = {},
 	emmet_language_server = {
 		filetypes = { "html", "css", "javascriptreact", "typescriptreact", "svelte" },
 	},
@@ -123,8 +121,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 		local function map(lhs, rhs, desc)
 			vim.keymap.set("n", lhs, rhs, { buffer = ev.buf, silent = true, desc = desc })
 		end
-
-		map("gd", vim.lsp.buf.definition, "Go to definition")
 
 		-- harper: writes word to shared spellfile via code action
 		map("<leader>ha", function()

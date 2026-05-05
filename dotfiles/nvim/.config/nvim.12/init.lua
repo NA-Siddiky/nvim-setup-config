@@ -6,3 +6,4 @@ for _, file in ipairs(vim.fn.globpath(config .. "/lua", "[0-9][0-9]_*.lua", fals
 end
 
 require("qol")
+require("qol_mini")

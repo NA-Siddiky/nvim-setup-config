@@ -23,13 +23,7 @@ conform.setup({
 		python          = { "isort", "black" },
 		go              = { "goimports", "gofumpt" },
 	},
-	format_on_save = { lsp_fallback = true, async = false, timeout_ms = 3000 },
-})
-
-vim.api.nvim_create_autocmd({ "BufReadPost", "BufWritePost" }, {
-	callback = function(args)
-		conform.format({ bufnr = args.buf, timeout_ms = 1500, lsp_fallback = false })
-	end,
+	format_on_save = { lsp_format = "fallback", async = false, timeout_ms = 3000 },
 })
 
 local lint = require("lint")
