@@ -13,11 +13,12 @@ theme = Gruvbox Material Dark
 # ============================================================================
 
 # Primary font with ligatures enabled
-# font-family = Maple Mono NF
-font-family = JetBrains Mono
-font-family = Noto Sans Bengali
+font-family = Maple Mono NF
+# font-family = JetBrains Mono
+# font-family = Cascadia Code Mono
 font-size = 14
 font-feature = +liga +calt +ss01 +ss02 +ss03
+
 
 # Quick-switch font alternatives (uncomment to try):
 # font-family = MonaspiceRn Nerd Font Propo  # => === >=
@@ -43,8 +44,9 @@ window-padding-balance = true
 # Visual effects
 background-blur = true
 background-opacity = 0.96
-background-blur-radius = 24
-background-image = /Users/mahi/Pictures/pokemon_bg/58.png
+background = #282828
+background-blur-radius = 120
+background-image = /Users/mahi/Pictures/pokemon_bg/183.png
 # managed by scripts/pokemon-bg.sh — run it once to activate
 background-image-opacity = 0.15
 background-image-fit = none
