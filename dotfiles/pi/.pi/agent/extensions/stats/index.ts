@@ -6,7 +6,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  createInputRecord, finalizeInputRecord, finalizeSession,
+  closeDb, createInputRecord, finalizeInputRecord, finalizeSession,
   getDailyStats, getDurationHistogram, getModelEfficiency, getOverallStats,
   getRecentSessions, getStreak, getTodayStats, getTokenWaste, getToollessInputCount,
   getTopModelsByInputs, getTopProjects, getTopToolsByInputs, getWeeklyStats, upsertSession,
@@ -76,7 +76,7 @@ export default function (pi: ExtensionAPI) {
   /* ── session lifecycle ──────────────────────────────────────────────────── */
 
   pi.on("session_start", (_, ctx: ExtensionContext) => {
-    const id = ctx.sessionManager.getSessionFile() ?? randomUUID();
+    const id = ctx.sessionManager.getSessionId();
     const now = Date.now();
     session = {
       id, startedAt: now, turns: 0, tokens: 0,
@@ -194,6 +194,7 @@ export default function (pi: ExtensionAPI) {
       session.tools, session.commands, session.skills, session.models,
     );
     session = null;
+    closeDb();
   });
 
   /* ── /stat command ──────────────────────────────────────────────────────── */

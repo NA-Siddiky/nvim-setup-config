@@ -9,6 +9,12 @@ import { localDateStr } from "./format.js";
 const DB_PATH = join(homedir(), ".pi", "agent", "stats.db");
 let _db: DatabaseSync | null = null;
 
+export function closeDb(): void {
+  if (!_db) return;
+  try { _db.close(); } catch { /* ignore */ }
+  _db = null;
+}
+
 export function getDb(): DatabaseSync {
   if (_db) return _db;
   mkdirSync(join(homedir(), ".pi", "agent"), { recursive: true });
