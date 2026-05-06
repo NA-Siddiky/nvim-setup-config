@@ -7,9 +7,8 @@ plugins=(git z zsh-autosuggestions zsh-syntax-highlighting)
 source $ZSH/oh-my-zsh.sh
 
 # aliases
-alias vm="NVIM_APPNAME=nvim.12 nvim"
-alias vi="NVIM_APPNAME=nvim-chad nvim"
-alias v="nvim"
+alias v="NVIM_APPNAME=nvim.12 nvim"
+alias vm="nvim"
 alias a="pi"
 alias zc="vi ~/.zshrc"
 alias zs="source ~/.zshrc"
