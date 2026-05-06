@@ -131,11 +131,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	end,
 })
 
-vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
-	group = vim.api.nvim_create_augroup("codelens", { clear = true }),
-	callback = function(ev)
-		if #vim.lsp.get_clients({ bufnr = ev.buf }) > 0 then
-			vim.lsp.codelens.enable(true, { bufnr = ev.buf })
-		end
-	end,
-})
+-- vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
+-- 	group = vim.api.nvim_create_augroup("codelens", { clear = true }),
+-- 	callback = function(ev)
+-- 		if #vim.lsp.get_clients({ bufnr = ev.buf }) > 0 then
+-- 			vim.lsp.codelens.enable(true, { bufnr = ev.buf })
+-- 		end
+-- 	end,
+-- })

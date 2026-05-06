@@ -5,6 +5,7 @@ vim.pack.add({
 	"https://github.com/brianhuster/live-preview.nvim",
 	"https://github.com/folke/todo-comments.nvim",
 	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
+	"https://github.com/windwp/nvim-ts-autotag",
 })
 
 require("flash").setup()
@@ -27,3 +28,5 @@ require("render-markdown").setup({})
 
 vim.keymap.set("n", "<leader>lo", "<cmd>LivePreview start<CR>", { silent = true, desc = "Open live preview" })
 vim.keymap.set("n", "<leader>lc", "<cmd>LivePreview close<CR>", { silent = true, desc = "Close live preview" })
+
+require("nvim-ts-autotag").setup()

@@ -22,7 +22,7 @@ require("blink.cmp").setup({
 		ghost_text = { enabled = false },
 		menu = {
 			auto_show = true,
-			auto_show_delay_ms = 180,
+			auto_show_delay_ms = 0,
 			draw = {
 				treesitter = { "lsp" },
 				columns = {
@@ -34,4 +34,7 @@ require("blink.cmp").setup({
 	},
 })
 
-require("supermaven-nvim").setup({ keymaps = { accept_suggestion = "<Tab>" } })
+require("supermaven-nvim").setup({
+	ignore_filetypes = {},
+	-- color = { suggestion_color = "#6c7086", cterm = 244 },
+})
