@@ -1,13 +1,16 @@
 // https://github.com/ben-vargas/pi-packages/blob/main/packages/pi-claude-code-use/extensions/index.ts
 import { appendFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
-import { createJiti } from "@mariozechner/jiti";
-import * as piAgentCoreModule from "@mariozechner/pi-agent-core";
-import * as piAiModule from "@mariozechner/pi-ai";
-import * as piAiOauthModule from "@mariozechner/pi-ai/oauth";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import * as piCodingAgentModule from "@mariozechner/pi-coding-agent";
-import * as piTuiModule from "@mariozechner/pi-tui";
+import { createJiti } from "jiti";
+import * as piAgentCoreModule from "@earendil-works/pi-agent-core";
+import * as piAiModule from "@earendil-works/pi-ai";
+import * as piAiOauthModule from "@earendil-works/pi-ai/oauth";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import * as piCodingAgentModule from "@earendil-works/pi-coding-agent";
+import * as piTuiModule from "@earendil-works/pi-tui";
 import * as typeboxModule from "typebox";
 import * as typeboxCompileModule from "typebox/compile";
 import * as typeboxValueModule from "typebox/value";
@@ -24,10 +27,17 @@ interface CompanionSpec {
 
 type ToolRegistration = Parameters<ExtensionAPI["registerTool"]>[0];
 type ToolInfo = ReturnType<ExtensionAPI["getAllTools"]>[number];
+type ExtensionFactory = (pi: ExtensionAPI) => void | Promise<void>;
+type JitiLoader = {
+  import(path: string, opts?: { default?: boolean }): Promise<unknown>;
+};
 
 // ============================================================================
 // Constants
 // ============================================================================
+
+const DEBUG_LOG_ENV = "PI_CLAUDE_CODE_USE_DEBUG_LOG";
+const DISABLE_TOOL_FILTER_ENV = "PI_CLAUDE_CODE_USE_DISABLE_TOOL_FILTER";
 
 /**
  * Core Claude Code tool names that always pass through Anthropic OAuth filtering.
@@ -63,6 +73,11 @@ const FLAT_TO_MCP = new Map<string, string>([
   ["firecrawl_search", "mcp__firecrawl__search"],
 ]);
 
+/** MCP-style alias → flat companion tool name. */
+const MCP_TO_FLAT = new Map<string, string>(
+  [...FLAT_TO_MCP].map(([flat, mcp]) => [mcp, flat]),
+);
+
 /** Known companion extensions and the tools they provide. */
 const COMPANIONS: CompanionSpec[] = [
   {
@@ -91,8 +106,30 @@ const TOOL_TO_COMPANION = new Map<string, CompanionSpec>(
   ),
 );
 
+const JITI_VIRTUAL_MODULES = {
+  "@earendil-works/pi-agent-core": piAgentCoreModule,
+  "@earendil-works/pi-ai": piAiModule,
+  "@earendil-works/pi-ai/oauth": piAiOauthModule,
+  "@earendil-works/pi-coding-agent": piCodingAgentModule,
+  "@earendil-works/pi-tui": piTuiModule,
+
+  // Back-compat for older companion packages that still import the old scope.
+  "@mariozechner/pi-agent-core": piAgentCoreModule,
+  "@mariozechner/pi-ai": piAiModule,
+  "@mariozechner/pi-ai/oauth": piAiOauthModule,
+  "@mariozechner/pi-coding-agent": piCodingAgentModule,
+  "@mariozechner/pi-tui": piTuiModule,
+
+  typebox: typeboxModule,
+  "typebox/compile": typeboxCompileModule,
+  "typebox/value": typeboxValueModule,
+  "@sinclair/typebox": typeboxModule,
+  "@sinclair/typebox/compile": typeboxCompileModule,
+  "@sinclair/typebox/value": typeboxValueModule,
+};
+
 // ============================================================================
-// Helpers
+// Generic helpers
 // ============================================================================
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -101,6 +138,27 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function lower(name: string | undefined): string {
   return (name ?? "").trim().toLowerCase();
+}
+
+function setIfChanged<T extends Record<string, unknown>, K extends keyof T>(
+  source: T,
+  current: T,
+  key: K,
+  value: T[K],
+): T {
+  if (current[key] === value) return current;
+  const target = current === source ? { ...source } : current;
+  target[key] = value;
+  return target;
+}
+
+function sameStringArray(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  return (
+    left.length === right.length && left.every((value, i) => value === right[i])
+  );
 }
 
 // ============================================================================
@@ -124,7 +182,9 @@ function rewriteSystemField(system: unknown): unknown {
   if (!Array.isArray(system)) {
     return system;
   }
-  return system.map((block) => {
+
+  let changed = false;
+  const blocks = system.map((block) => {
     if (
       !isPlainObject(block) ||
       block.type !== "text" ||
@@ -132,9 +192,15 @@ function rewriteSystemField(system: unknown): unknown {
     ) {
       return block;
     }
+
     const rewritten = rewritePromptText(block.text);
-    return rewritten === block.text ? block : { ...block, text: rewritten };
+    if (rewritten === block.text) return block;
+
+    changed = true;
+    return { ...block, text: rewritten };
   });
+
+  return changed ? blocks : system;
 }
 
 // ============================================================================
@@ -146,10 +212,10 @@ function rewriteSystemField(system: unknown): unknown {
 // 3. Tools already prefixed with mcp__ → pass through
 // 4. Known companion tools whose MCP alias is also advertised → rename to alias
 // 5. Known companion tools without an advertised alias → filtered out
-// 6. Unknown flat-named tools → filtered out (unless disableFilter)
+// 6. Unknown flat-named tools → filtered out
 // ============================================================================
 
-function collectToolNames(tools: unknown[]): Set<string> {
+function collectToolNames(tools: readonly unknown[]): Set<string> {
   const names = new Set<string>();
   for (const tool of tools) {
     if (isPlainObject(tool) && typeof tool.name === "string") {
@@ -160,7 +226,7 @@ function collectToolNames(tools: unknown[]): Set<string> {
 }
 
 function collectToolsByName(
-  tools: unknown[],
+  tools: readonly unknown[],
 ): Map<string, Record<string, unknown>> {
   const byName = new Map<string, Record<string, unknown>>();
   for (const tool of tools) {
@@ -171,9 +237,20 @@ function collectToolsByName(
   return byName;
 }
 
+function collectSurvivingToolNames(tools: unknown): Map<string, string> {
+  const names = new Map<string, string>();
+  if (!Array.isArray(tools)) return names;
+
+  for (const tool of tools) {
+    if (isPlainObject(tool) && typeof tool.name === "string") {
+      names.set(lower(tool.name), tool.name);
+    }
+  }
+  return names;
+}
+
 function filterAndRemapTools(
   tools: unknown[] | undefined,
-  disableFilter: boolean,
 ): unknown[] | undefined {
   if (!Array.isArray(tools)) return tools;
 
@@ -181,53 +258,56 @@ function filterAndRemapTools(
   const toolsByName = collectToolsByName(tools);
   const emitted = new Set<string>();
   const result: unknown[] = [];
+  let changed = false;
 
   for (const tool of tools) {
-    if (!isPlainObject(tool)) continue;
+    if (!isPlainObject(tool)) {
+      changed = true;
+      continue;
+    }
 
-    // Rule 1: native typed tools always pass through
+    // Rule 1: native typed tools always pass through.
     if (typeof tool.type === "string" && tool.type.trim().length > 0) {
       result.push(tool);
       continue;
     }
 
     const name = typeof tool.name === "string" ? tool.name : "";
-    if (!name) continue;
-    const nameLc = lower(name);
-
-    // Rules 2 & 3: core tools and mcp__-prefixed pass through (with dedup)
-    if (CORE_TOOL_NAMES.has(nameLc) || nameLc.startsWith("mcp__")) {
-      if (!emitted.has(nameLc)) {
-        emitted.add(nameLc);
-        result.push(tool);
-      }
+    if (!name) {
+      changed = true;
       continue;
     }
 
-    // Rules 4 & 5: known companion tool
+    const nameLc = lower(name);
+
+    // Rules 2 & 3: core tools and mcp__-prefixed tools pass through, deduped.
+    if (CORE_TOOL_NAMES.has(nameLc) || nameLc.startsWith("mcp__")) {
+      if (emitted.has(nameLc)) {
+        changed = true;
+        continue;
+      }
+      emitted.add(nameLc);
+      result.push(tool);
+      continue;
+    }
+
+    // Rules 4 & 5: known companion flat names survive only via advertised aliases.
     const mcpAlias = FLAT_TO_MCP.get(nameLc);
     if (mcpAlias) {
       const aliasLc = lower(mcpAlias);
       if (advertised.has(aliasLc) && !emitted.has(aliasLc)) {
-        // Alias exists in tool list -> preserve its metadata, including cache_control.
         emitted.add(aliasLc);
         result.push(toolsByName.get(aliasLc) ?? { ...tool, name: mcpAlias });
-      } else if (disableFilter && !emitted.has(nameLc)) {
-        // Filter disabled: keep flat name if not yet emitted
-        emitted.add(nameLc);
-        result.push(tool);
       }
+      changed = true;
       continue;
     }
 
-    // Rule 6: unknown flat-named tool
-    if (disableFilter && !emitted.has(nameLc)) {
-      emitted.add(nameLc);
-      result.push(tool);
-    }
+    // Rule 6: unknown flat-named tools are filtered out.
+    changed = true;
   }
 
-  return result;
+  return changed ? result : tools;
 }
 
 function remapToolChoice(
@@ -259,6 +339,7 @@ function remapMessageToolNames(
   survivingNames: Map<string, string>,
 ): unknown[] {
   let anyChanged = false;
+
   const result = messages.map((msg) => {
     if (!isPlainObject(msg) || !Array.isArray(msg.content)) return msg;
 
@@ -271,6 +352,7 @@ function remapMessageToolNames(
       ) {
         return block;
       }
+
       const mcpAlias = FLAT_TO_MCP.get(lower(block.name));
       if (mcpAlias && survivingNames.has(lower(mcpAlias))) {
         msgChanged = true;
@@ -279,11 +361,10 @@ function remapMessageToolNames(
       return block;
     });
 
-    if (msgChanged) {
-      anyChanged = true;
-      return { ...msg, content };
-    }
-    return msg;
+    if (!msgChanged) return msg;
+
+    anyChanged = true;
+    return { ...msg, content };
   });
 
   return anyChanged ? result : messages;
@@ -297,48 +378,55 @@ function transformPayload(
   raw: Record<string, unknown>,
   disableFilter: boolean,
 ): Record<string, unknown> {
-  // Deep clone to avoid mutating the original
-  const payload = JSON.parse(JSON.stringify(raw)) as Record<string, unknown>;
+  let payload = raw;
 
-  // 1. System prompt rewrite (always applies)
-  if (payload.system !== undefined) {
-    payload.system = rewriteSystemField(payload.system);
+  // 1. System prompt rewrite (always applies).
+  if (raw.system !== undefined) {
+    payload = setIfChanged(
+      raw,
+      payload,
+      "system",
+      rewriteSystemField(raw.system),
+    );
   }
 
-  // When escape hatch is active, skip all tool filtering/remapping
+  // Escape hatch: keep tool payloads untouched, but still apply prompt rewrite.
   if (disableFilter) {
     return payload;
   }
 
-  // 2. Tool filtering and alias remapping
-  payload.tools = filterAndRemapTools(
-    payload.tools as unknown[] | undefined,
-    false,
-  );
-
-  // 3. Build map of tool names that survived filtering (lowercase → actual name)
-  const survivingNames = new Map<string, string>();
-  if (Array.isArray(payload.tools)) {
-    for (const tool of payload.tools) {
-      if (isPlainObject(tool) && typeof tool.name === "string") {
-        survivingNames.set(lower(tool.name), tool.name as string);
-      }
-    }
+  // 2. Tool filtering and alias remapping.
+  if (Array.isArray(raw.tools)) {
+    payload = setIfChanged(
+      raw,
+      payload,
+      "tools",
+      filterAndRemapTools(raw.tools),
+    );
   }
 
-  // 4. Remap tool_choice if it references a renamed or filtered tool
+  // 3. Build map of tool names that survived filtering (lowercase → actual name).
+  const survivingNames = collectSurvivingToolNames(payload.tools);
+
+  // 4. Remap tool_choice if it references a renamed or filtered tool.
   if (isPlainObject(payload.tool_choice)) {
     const remapped = remapToolChoice(payload.tool_choice, survivingNames);
     if (remapped === undefined) {
+      if (payload === raw) payload = { ...raw };
       delete payload.tool_choice;
     } else {
-      payload.tool_choice = remapped;
+      payload = setIfChanged(raw, payload, "tool_choice", remapped);
     }
   }
 
-  // 5. Rewrite historical tool_use blocks in message history
+  // 5. Rewrite historical tool_use blocks in message history.
   if (Array.isArray(payload.messages)) {
-    payload.messages = remapMessageToolNames(payload.messages, survivingNames);
+    payload = setIfChanged(
+      raw,
+      payload,
+      "messages",
+      remapMessageToolNames(payload.messages, survivingNames),
+    );
   }
 
   return payload;
@@ -348,10 +436,10 @@ function transformPayload(
 // Debug logging (PRD §1.4)
 // ============================================================================
 
-const debugLogPath = process.env.PI_CLAUDE_CODE_USE_DEBUG_LOG;
-
 function writeDebugLog(payload: unknown): void {
+  const debugLogPath = process.env[DEBUG_LOG_ENV];
   if (!debugLogPath) return;
+
   try {
     appendFileSync(
       debugLogPath,
@@ -359,7 +447,7 @@ function writeDebugLog(payload: unknown): void {
       "utf-8",
     );
   } catch {
-    // Debug logging must never break actual requests
+    // Debug logging must never break actual requests.
   }
 }
 
@@ -376,52 +464,51 @@ const autoActivatedAliases = new Set<string>();
 let lastManagedToolList: string[] | undefined;
 
 const captureCache = new Map<string, Promise<Map<string, ToolRegistration>>>();
-let jitiLoader:
-  | { import(path: string, opts?: { default?: boolean }): Promise<unknown> }
-  | undefined;
+let jitiLoader: JitiLoader | undefined;
+let aliasRegistration: Promise<void> | undefined;
 
-function getJitiLoader() {
+function getJitiLoader(): JitiLoader {
   if (!jitiLoader) {
     jitiLoader = createJiti(import.meta.url, {
       moduleCache: false,
       tryNative: false,
-      virtualModules: {
-        "@mariozechner/pi-agent-core": piAgentCoreModule,
-        "@mariozechner/pi-ai": piAiModule,
-        "@mariozechner/pi-ai/oauth": piAiOauthModule,
-        "@mariozechner/pi-coding-agent": piCodingAgentModule,
-        "@mariozechner/pi-tui": piTuiModule,
-        typebox: typeboxModule,
-        "typebox/compile": typeboxCompileModule,
-        "typebox/value": typeboxValueModule,
-        "@sinclair/typebox": typeboxModule,
-        "@sinclair/typebox/compile": typeboxCompileModule,
-        "@sinclair/typebox/value": typeboxValueModule,
-      },
-    });
+      virtualModules: JITI_VIRTUAL_MODULES,
+    }) as JitiLoader;
   }
   return jitiLoader;
 }
 
-async function loadFactory(
-  baseDir: string,
-): Promise<((pi: ExtensionAPI) => void | Promise<void>) | undefined> {
-  const dir = baseDir.replace(/\/$/, "");
-  const candidates = [
-    `${dir}/index.ts`,
-    `${dir}/index.js`,
-    `${dir}/extensions/index.ts`,
-    `${dir}/extensions/index.js`,
-  ];
+function getFactoryCandidates(entryOrDir: string): string[] {
+  const path = entryOrDir.replace(/\/$/, "");
+  if (/\.[cm]?[jt]s$/.test(path)) {
+    const dir = dirname(path);
+    return [
+      path,
+      `${dir}/index.ts`,
+      `${dir}/index.js`,
+      `${dir}/extensions/index.ts`,
+      `${dir}/extensions/index.js`,
+    ];
+  }
 
+  return [
+    `${path}/index.ts`,
+    `${path}/index.js`,
+    `${path}/extensions/index.ts`,
+    `${path}/extensions/index.js`,
+  ];
+}
+
+async function loadFactory(
+  entryOrDir: string,
+): Promise<ExtensionFactory | undefined> {
   const loader = getJitiLoader();
-  for (const path of candidates) {
+  for (const path of getFactoryCandidates(entryOrDir)) {
     try {
       const mod = await loader.import(path, { default: true });
-      if (typeof mod === "function")
-        return mod as (pi: ExtensionAPI) => void | Promise<void>;
+      if (typeof mod === "function") return mod as ExtensionFactory;
     } catch {
-      // Try next candidate
+      // Try next candidate.
     }
   }
   return undefined;
@@ -437,15 +524,19 @@ function isCompanionSource(
   if (baseDir) {
     const dirName = basename(baseDir);
     if (dirName === spec.dirName) return true;
-    if (dirName === "extensions" && basename(dirname(baseDir)) === spec.dirName)
+    if (
+      dirName === "extensions" &&
+      basename(dirname(baseDir)) === spec.dirName
+    ) {
       return true;
+    }
   }
 
   const fullPath = tool.sourceInfo.path;
   if (typeof fullPath !== "string") return false;
-  // Normalize backslashes for Windows paths before segment-bounded check
+
+  // Normalize backslashes for Windows paths before segment-bounded checks.
   const normalized = fullPath.replaceAll("\\", "/");
-  // Check for scoped package name (npm install) or directory name (git/monorepo)
   return (
     normalized.includes(`/${spec.packageName}/`) ||
     normalized.includes(`/${spec.dirName}/`)
@@ -457,6 +548,7 @@ function buildCaptureShim(
   captured: Map<string, ToolRegistration>,
 ): ExtensionAPI {
   const shimFlags = new Set<string>();
+
   return {
     registerTool(def) {
       captured.set(def.name, def as unknown as ToolRegistration);
@@ -490,52 +582,47 @@ function buildCaptureShim(
     getAllTools() {
       return realPi.getAllTools();
     },
-    setActiveTools(names) {
-      realPi.setActiveTools(names);
-    },
+    setActiveTools() {},
     getCommands() {
       return realPi.getCommands();
     },
-    setModel(model) {
-      return realPi.setModel(model);
+    async setModel() {
+      return false;
     },
     getThinkingLevel() {
       return realPi.getThinkingLevel();
     },
-    setThinkingLevel(level) {
-      realPi.setThinkingLevel(level);
-    },
+    setThinkingLevel() {},
     events: realPi.events,
   } as ExtensionAPI;
 }
 
 async function captureCompanionTools(
-  baseDir: string,
+  entryOrDir: string,
   realPi: ExtensionAPI,
 ): Promise<Map<string, ToolRegistration>> {
-  let pending = captureCache.get(baseDir);
+  let pending = captureCache.get(entryOrDir);
   if (!pending) {
     pending = (async () => {
-      const factory = await loadFactory(baseDir);
+      const factory = await loadFactory(entryOrDir);
       if (!factory) return new Map<string, ToolRegistration>();
+
       const tools = new Map<string, ToolRegistration>();
       await factory(buildCaptureShim(realPi, tools));
       return tools;
     })();
-    captureCache.set(baseDir, pending);
+    captureCache.set(entryOrDir, pending);
   }
   return pending;
 }
 
-async function registerAliasesForLoadedCompanions(
+async function doRegisterAliasesForLoadedCompanions(
   pi: ExtensionAPI,
 ): Promise<void> {
-  // Clear capture cache so flag/config changes since last call take effect
-  captureCache.clear();
-
   const allTools = pi.getAllTools();
   const toolIndex = new Map<string, ToolInfo>();
   const knownNames = new Set<string>();
+
   for (const tool of allTools) {
     toolIndex.set(lower(tool.name), tool);
     knownNames.add(lower(tool.name));
@@ -543,21 +630,23 @@ async function registerAliasesForLoadedCompanions(
 
   for (const spec of COMPANIONS) {
     for (const [flatName, mcpName] of spec.aliases) {
-      if (registeredMcpAliases.has(mcpName) || knownNames.has(lower(mcpName)))
+      const aliasLc = lower(mcpName);
+      if (registeredMcpAliases.has(mcpName)) continue;
+
+      if (knownNames.has(aliasLc)) {
+        registeredMcpAliases.add(mcpName);
         continue;
+      }
 
       const tool = toolIndex.get(lower(flatName));
       if (!tool || !isCompanionSource(tool, spec)) continue;
 
-      // Prefer the extension file's directory for loading (sourceInfo.path is the actual
-      // entry point). Fall back to baseDir only if path is unavailable. baseDir can be
-      // the monorepo root which doesn't contain the extension entry point directly.
-      const loadDir = tool.sourceInfo?.path
-        ? dirname(tool.sourceInfo.path)
-        : tool.sourceInfo?.baseDir;
-      if (!loadDir) continue;
+      // Prefer the concrete extension entry point when available. Falling back to
+      // baseDir supports directory-style packages and monorepos.
+      const loadTarget = tool.sourceInfo?.path ?? tool.sourceInfo?.baseDir;
+      if (!loadTarget) continue;
 
-      const captured = await captureCompanionTools(loadDir, pi);
+      const captured = await captureCompanionTools(loadTarget, pi);
       const def = captured.get(flatName);
       if (!def) continue;
 
@@ -568,10 +657,18 @@ async function registerAliasesForLoadedCompanions(
           ? def.label
           : `MCP ${def.label ?? mcpName}`,
       });
+
       registeredMcpAliases.add(mcpName);
-      knownNames.add(lower(mcpName));
+      knownNames.add(aliasLc);
     }
   }
+}
+
+function registerAliasesForLoadedCompanions(pi: ExtensionAPI): Promise<void> {
+  aliasRegistration ??= doRegisterAliasesForLoadedCompanions(pi).finally(() => {
+    aliasRegistration = undefined;
+  });
+  return aliasRegistration;
 }
 
 /**
@@ -581,93 +678,77 @@ async function registerAliasesForLoadedCompanions(
  */
 function syncAliasActivation(pi: ExtensionAPI, enableAliases: boolean): void {
   const activeNames = pi.getActiveTools();
-  const allNames = new Set(pi.getAllTools().map((t) => t.name));
+  const activeSet = new Set(activeNames);
+  const allNames = new Set(pi.getAllTools().map((tool) => tool.name));
 
   if (enableAliases) {
-    // Determine which aliases should be active based on their flat counterpart being active
     const activeLc = new Set(activeNames.map(lower));
-    const desiredAliases: string[] = [];
-    for (const [flat, mcp] of FLAT_TO_MCP) {
-      if (
-        activeLc.has(flat) &&
-        allNames.has(mcp) &&
-        registeredMcpAliases.has(mcp)
-      ) {
-        desiredAliases.push(mcp);
-      }
-    }
+    const desiredAliases = [...FLAT_TO_MCP].flatMap(([flat, mcp]) =>
+      activeLc.has(flat) && allNames.has(mcp) && registeredMcpAliases.has(mcp)
+        ? [mcp]
+        : [],
+    );
     const desiredSet = new Set(desiredAliases);
 
     // Promote auto-activated aliases to user-selected when the user explicitly kept
     // the alias while removing its flat counterpart from the tool picker.
-    // We detect this by checking: (a) user changed the tool list since our last sync,
-    // (b) the flat tool was previously managed but is no longer active, and
-    // (c) the alias is still active. This means the user deliberately kept the alias.
     if (lastManagedToolList !== undefined) {
-      const activeSet = new Set(activeNames);
       const lastManaged = new Set(lastManagedToolList);
       for (const alias of autoActivatedAliases) {
         if (!activeSet.has(alias) || desiredSet.has(alias)) continue;
-        // Find the flat name for this alias
-        const flatName = [...FLAT_TO_MCP.entries()].find(
-          ([, mcp]) => mcp === alias,
-        )?.[0];
+
+        const flatName = MCP_TO_FLAT.get(alias);
         if (flatName && lastManaged.has(flatName) && !activeSet.has(flatName)) {
-          // User removed the flat tool but kept the alias → promote to user-selected
           autoActivatedAliases.delete(alias);
         }
       }
     }
 
-    // Find registered aliases currently in the active list
-    const activeRegistered = activeNames.filter(
-      (n) => registeredMcpAliases.has(n) && allNames.has(n),
+    const activeRegisteredAliases = activeNames.filter(
+      (name) => registeredMcpAliases.has(name) && allNames.has(name),
     );
 
-    // Per-alias provenance: an alias is "user-selected" if it's active and was NOT
-    // auto-activated by us. Only preserve those; auto-activated aliases get re-derived
-    // from the desired set each sync.
-    const preserved = activeRegistered.filter(
-      (n) => !autoActivatedAliases.has(n),
+    // An alias is user-selected if it is active and was not auto-activated by us.
+    const preservedAliases = activeRegisteredAliases.filter(
+      (name) => !autoActivatedAliases.has(name),
     );
 
-    // Build result: non-alias tools + preserved user aliases + desired aliases
-    const nonAlias = activeNames.filter((n) => !registeredMcpAliases.has(n));
+    const nonAliasTools = activeNames.filter(
+      (name) => !registeredMcpAliases.has(name),
+    );
     const next = Array.from(
-      new Set([...nonAlias, ...preserved, ...desiredAliases]),
+      new Set([...nonAliasTools, ...preservedAliases, ...desiredAliases]),
     );
 
-    // Update auto-activation tracking: aliases we added this sync that weren't user-preserved
-    const preservedSet = new Set(preserved);
+    const preservedSet = new Set(preservedAliases);
     autoActivatedAliases.clear();
     for (const name of desiredAliases) {
-      if (!preservedSet.has(name)) {
-        autoActivatedAliases.add(name);
-      }
+      if (!preservedSet.has(name)) autoActivatedAliases.add(name);
     }
 
-    if (
-      next.length !== activeNames.length ||
-      next.some((n, i) => n !== activeNames[i])
-    ) {
+    if (!sameStringArray(next, activeNames)) {
       pi.setActiveTools(next);
-      lastManagedToolList = [...next];
     }
-  } else {
-    // Remove only auto-activated aliases; user-selected ones are preserved
-    const next = activeNames.filter((n) => !autoActivatedAliases.has(n));
-    autoActivatedAliases.clear();
-
-    if (
-      next.length !== activeNames.length ||
-      next.some((n, i) => n !== activeNames[i])
-    ) {
-      pi.setActiveTools(next);
-      lastManagedToolList = [...next];
-    } else {
-      lastManagedToolList = undefined;
-    }
+    lastManagedToolList = [...next];
+    return;
   }
+
+  const next = activeNames.filter((name) => !autoActivatedAliases.has(name));
+  autoActivatedAliases.clear();
+
+  if (!sameStringArray(next, activeNames)) {
+    pi.setActiveTools(next);
+    lastManagedToolList = [...next];
+  } else {
+    lastManagedToolList = undefined;
+  }
+}
+
+function isAnthropicOAuthModel(ctx: ExtensionContext): boolean {
+  const model = ctx.model;
+  return (
+    model?.provider === "anthropic" && ctx.modelRegistry.isUsingOAuth(model)
+  );
 }
 
 // ============================================================================
@@ -681,31 +762,18 @@ export default async function piClaudeCodeUse(pi: ExtensionAPI): Promise<void> {
 
   pi.on("before_agent_start", async (_event, ctx) => {
     await registerAliasesForLoadedCompanions(pi);
-    const model = ctx.model;
-    const isOAuth =
-      model?.provider === "anthropic" && ctx.modelRegistry.isUsingOAuth(model);
-    syncAliasActivation(pi, isOAuth);
+    syncAliasActivation(pi, isAnthropicOAuthModel(ctx));
   });
 
   pi.on("before_provider_request", (event, ctx) => {
-    const model = ctx.model;
-    if (
-      !model ||
-      model.provider !== "anthropic" ||
-      !ctx.modelRegistry.isUsingOAuth(model)
-    ) {
-      return undefined;
-    }
-    if (!isPlainObject(event.payload)) {
+    if (!isAnthropicOAuthModel(ctx) || !isPlainObject(event.payload)) {
       return undefined;
     }
 
     writeDebugLog({ stage: "before", payload: event.payload });
-    const disableFilter =
-      process.env.PI_CLAUDE_CODE_USE_DISABLE_TOOL_FILTER === "1";
     const transformed = transformPayload(
-      event.payload as Record<string, unknown>,
-      disableFilter,
+      event.payload,
+      process.env[DISABLE_TOOL_FILTER_ENV] === "1",
     );
     writeDebugLog({ stage: "after", payload: transformed });
     return transformed;
@@ -719,12 +787,15 @@ export default async function piClaudeCodeUse(pi: ExtensionAPI): Promise<void> {
 export const _test = {
   CORE_TOOL_NAMES,
   FLAT_TO_MCP,
+  MCP_TO_FLAT,
   COMPANIONS,
   TOOL_TO_COMPANION,
   autoActivatedAliases,
   buildCaptureShim,
+  collectSurvivingToolNames,
   collectToolNames,
   filterAndRemapTools,
+  getFactoryCandidates,
   getLastManagedToolList: () => lastManagedToolList,
   isCompanionSource,
   isPlainObject,
@@ -735,8 +806,8 @@ export const _test = {
   remapToolChoice,
   rewritePromptText,
   rewriteSystemField,
-  setLastManagedToolList: (v: string[] | undefined) => {
-    lastManagedToolList = v;
+  setLastManagedToolList: (value: string[] | undefined) => {
+    lastManagedToolList = value;
   },
   syncAliasActivation,
   transformPayload,
