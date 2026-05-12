@@ -202,7 +202,7 @@ export default function (pi: ExtensionAPI) {
     });
     ctx.ui.setWidget(
       "status-bottom",
-      [buildLine(bottomLeft, bottomRight), ""],
+      [buildLine(bottomLeft, bottomRight), " "],
       { placement: "belowEditor" },
     );
   }
