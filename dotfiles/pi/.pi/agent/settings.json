@@ -15,8 +15,8 @@
   "showHardwareCursor": true,
   "editorPaddingX": 1,
   "terminal": {
-    "clearOnShrink": true,
-    "showTerminalProgress": true
+    "clearOnShrink": false,
+    "showTerminalProgress": false
   },
   "hideThinkingBlock": false,
   "quietStartup": true,
