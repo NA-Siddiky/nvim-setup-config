@@ -170,8 +170,8 @@ export default function (pi: ExtensionAPI) {
     if (key === lastKey) return;
     lastKey = key;
 
-    ctx.ui.setWidget("status-top",    [buildLine(r1L, r1R)],           { placement: "aboveEditor" });
-    ctx.ui.setWidget("status-bottom", [r2R ? buildLine(r2L, r2R) : r2L, ""], { placement: "belowEditor" });
+    ctx.ui.setWidget("status-top",    [buildLine(r1L, r1R)],                  { placement: "aboveEditor" });
+    ctx.ui.setWidget("status-bottom", [r2R ? buildLine(r2L, r2R) : r2L], { placement: "belowEditor" });
   }
 
   // ── Events ────────────────────────────────────────────────────────────────
@@ -195,8 +195,10 @@ export default function (pi: ExtensionAPI) {
     sessionStartAt = lastActivityAt = Date.now();
     turnCount = 0; agentRunning = false; lastKey = "";
 
+    // Long interval — only updates idle label/color, not critical
+    // Does NOT call setWidget during autocomplete (dedup + no forced repaints)
     clearInterval(idleTimer);
-    idleTimer = setInterval(update, 15_000);
+    idleTimer = setInterval(() => { if (!agentRunning) update(); }, 30_000);
 
     ctx.ui.setFooter(() => ({ render: () => [], invalidate() {} }));
     update();
