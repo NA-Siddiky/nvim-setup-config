@@ -59,17 +59,23 @@ function gitCache(cmd: string, ttl: number, fallback: string, tx: (s: string) =>
 const gitBranch = gitCache("git rev-parse --abbrev-ref HEAD", 3_000, "", s => s);
 const gitDirty  = gitCache("git status --porcelain",          1_500, "", s => s ? "*" : "");
 
-function sumCost(ctx: ExtensionContext): number {
-  let cost = 0;
+interface Totals { input: number; output: number; cost: number }
+
+function sumTotals(ctx: ExtensionContext): Totals {
+  const t: Totals = { input: 0, output: 0, cost: 0 };
   for (const e of ctx.sessionManager.getBranch())
-    if (e.type === "message" && e.message.role === "assistant")
-      cost += (e.message as AssistantMessage).usage.cost.total ?? 0;
-  return cost;
+    if (e.type === "message" && e.message.role === "assistant") {
+      const u = (e.message as AssistantMessage).usage;
+      t.input  += u.input;
+      t.output += u.output;
+      t.cost   += u.cost.total ?? 0;
+    }
+  return t;
 }
 
 export default function (pi: ExtensionAPI) {
   const toolCounts = new Map<string, number>();
-  let cachedCost: number | undefined;
+  let cachedTotals: Totals | undefined;
   let cachedUsage: ReturnType<ExtensionContext["getContextUsage"]>;
   let lastKey = "";
   let lastActivityAt = 0, agentRunning = false;
@@ -83,21 +89,23 @@ export default function (pi: ExtensionAPI) {
     // top: provider  model  (thinking)        project  branch
     const model   = ctx.model;
     const prov    = PROVIDERS[model?.provider ?? ""];
+    const sep = c("\x1b[38;5;240m", " | ");
     const topLeft = [
       prov ? c(prov.color, `${prov.icon} ${prov.name}`) : "",
       c("\x1b[38;5;117m", MODELS[model?.id?.toLowerCase() ?? ""] ?? model?.id ?? "—"),
       c("\x1b[38;5;246m", `(${pi.getThinkingLevel()})`),
-    ].filter(Boolean).join("  ");
+    ].filter(Boolean).join(sep);
 
     const branch = gitBranch(), dirty = gitDirty();
     const topRight = [
       c("\x1b[38;5;179m", `\uF07B ${basename(ctx.cwd ?? "") || "root"}`),
       c(dirty ? "\x1b[38;5;214m" : "\x1b[38;5;246m", `\uE0A0 ${branch || "no-git"}${dirty}`),
-    ].join("  ");
+    ].join(sep);
 
     // bottom: $cost  45% (50K/200K)  idle 2m        Bash 3 │ Read 5
-    cachedCost  ??= sumCost(ctx);
-    cachedUsage ??= ctx.getContextUsage();
+    cachedTotals ??= sumTotals(ctx);
+    cachedUsage  ??= ctx.getContextUsage();
+    const t   = cachedTotals;
     const pct = cachedUsage?.percent ?? null;
     const pctColor = pct === null || pct < 60 ? "\x1b[38;5;142m" : pct < 80 ? "\x1b[38;5;214m" : "\x1b[38;5;196m";
 
@@ -108,29 +116,32 @@ export default function (pi: ExtensionAPI) {
       idleMs < 270_000 ? "\x1b[38;5;214m" :
       idleMs < 300_000 ? "\x1b[38;5;196m" : "\x1b[38;5;240m";
 
+    const div = c("\x1b[38;5;240m", " | ");
     const bottomLeft = [
-      c("\x1b[38;5;246m", cachedCost < 0.01 ? `$${cachedCost.toFixed(4)}` : `$${cachedCost.toFixed(3)}`),
+      c("\x1b[38;5;246m", `↑${fmt(t.input)}`),
+      c("\x1b[38;5;246m", `↓${fmt(t.output)}`),
+      c("\x1b[38;5;246m", t.cost < 0.01 ? `$${t.cost.toFixed(4)}` : `$${t.cost.toFixed(3)}`),
       pct !== null
         ? c(pctColor, `${Math.round(pct)}%`) + c("\x1b[38;5;240m", ` (${cachedUsage?.tokens != null ? fmt(cachedUsage.tokens) : "?"}/${cachedUsage ? fmt(cachedUsage.contextWindow) : "?"})`)
         : "",
       idleMs >= 0 ? c(idleColor, `idle ${fmtIdle(idleMs)}`) : "",
-    ].filter(Boolean).join("  ");
+    ].filter(Boolean).join(div);
 
     const bottomRight = toolCounts.size > 0
-      ? [...toolCounts.entries()].map(([n, cnt]) => c("\x1b[38;5;246m", `${n} ${cnt}`)).join(c("\x1b[38;5;240m", " │ "))
+      ? [...toolCounts.entries()].map(([n, cnt]) => c("\x1b[38;5;246m", `${n} ${cnt}`)).join(c("\x1b[38;5;240m", " | "))
       : "";
 
     const key = topLeft + topRight + bottomLeft + bottomRight;
     if (key === lastKey) return;
     lastKey = key;
 
-    ctx.ui.setWidget("status-top",    [buildLine(topLeft, topRight)],       { placement: "aboveEditor" });
-    ctx.ui.setWidget("status-bottom", [buildLine(bottomLeft, bottomRight)], { placement: "belowEditor" });
+    ctx.ui.setWidget("status-top",    [buildLine(topLeft, topRight)],            { placement: "aboveEditor" });
+    ctx.ui.setWidget("status-bottom", [buildLine(bottomLeft, bottomRight), ""], { placement: "belowEditor" });
   }
 
   pi.on("agent_start", () => { agentRunning = true; });
   pi.on("agent_end",   () => { agentRunning = false; lastActivityAt = Date.now(); update(); });
-  pi.on("turn_end",    () => { cachedCost = cachedUsage = undefined; update(); });
+  pi.on("turn_end",    () => { cachedTotals = cachedUsage = undefined; update(); });
   pi.on("model_select",          () => update());
   pi.on("thinking_level_select", () => update());
   pi.on("tool_execution_start",  (event) => {
@@ -142,7 +153,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     savedCtx = ctx;
     toolCounts.clear();
-    cachedCost = cachedUsage = undefined;
+    cachedTotals = cachedUsage = undefined;
     lastActivityAt = 0; agentRunning = false; lastKey = "";
 
     clearInterval(idleTimer);
