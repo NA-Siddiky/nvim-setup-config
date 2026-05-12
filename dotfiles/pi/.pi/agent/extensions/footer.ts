@@ -1,28 +1,15 @@
-/**
- * footer.ts — replicates the pi-copy status extension structure exactly.
- *
- * Same pattern: setWidget with pre-rendered string[], dedup guard,
- * no requestRender(), update() called from events only (+ idle timer).
- *
- * aboveEditor:  [provider icon] Provider  Model  (thinking)        project   branch
- * belowEditor:  ↑in  ↓out  ⊕cR  ⊗cW  $cost  45% (50K/200K)  idle 2m    Bash 3 │ Read 5
- */
-
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage }               from "@earendil-works/pi-ai";
 import { execSync }                            from "node:child_process";
 import { basename }                            from "node:path";
 
-// ── Formatting ────────────────────────────────────────────────────────────────
+const R = "\x1b[0m";
+const c = (code: string, text: string) => `${code}${text}${R}`;
 
-const FMT  = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const fmt  = (n: number) => FMT.format(n);
-const R    = "\x1b[0m";
-const ansi = (code: string, text: string) => `${code}${text}${R}`;
-const bold = (code: string, text: string) => `\x1b[1m${code}${text}${R}`;
+const FMT = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const fmt = (n: number) => FMT.format(n);
 
-function fmtElapsed(ms: number): string {
-  if (ms <= 0) return "0s";
+function fmtIdle(ms: number): string {
   const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60);
   if (h > 0) return `${h}h ${m % 60}m`;
   if (m > 0) return `${m}m ${s % 60}s`;
@@ -35,12 +22,9 @@ function stripAnsi(s: string): string {
 
 function buildLine(left: string, right: string): string {
   if (!right) return left;
-  const w   = (process.stdout.columns ?? 80) - 4;
-  const pad = Math.max(1, w - stripAnsi(left).length - stripAnsi(right).length);
+  const pad = Math.max(1, (process.stdout.columns ?? 80) - 4 - stripAnsi(left).length - stripAnsi(right).length);
   return left + " ".repeat(pad) + right;
 }
-
-// ── Provider / model ──────────────────────────────────────────────────────────
 
 const PROVIDERS: Record<string, { name: string; icon: string; color: string }> = {
   anthropic:           { name: "Anthropic", icon: "",   color: "\x1b[38;5;208m" },
@@ -62,9 +46,7 @@ const MODELS: Record<string, string> = {
   "qwen-3-235b-a22b-instruct-2507":"Qwen 3.235b",
 };
 
-// ── Git (TTL-cached) ──────────────────────────────────────────────────────────
-
-function makeGitCache(cmd: string, ttl: number, fallback: string, tx: (s: string) => string) {
+function gitCache(cmd: string, ttl: number, fallback: string, tx: (s: string) => string) {
   let v = fallback, t = 0;
   return () => {
     const now = Date.now();
@@ -74,117 +56,81 @@ function makeGitCache(cmd: string, ttl: number, fallback: string, tx: (s: string
     return v;
   };
 }
-const gitBranch = makeGitCache("git rev-parse --abbrev-ref HEAD", 3_000, "", s => s);
-const gitDirty  = makeGitCache("git status --porcelain",          1_500, "", s => s ? "*" : "");
+const gitBranch = gitCache("git rev-parse --abbrev-ref HEAD", 3_000, "", s => s);
+const gitDirty  = gitCache("git status --porcelain",          1_500, "", s => s ? "*" : "");
 
-// ── Token aggregation ─────────────────────────────────────────────────────────
-
-interface Totals { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number }
-
-function sumTotals(ctx: ExtensionContext): Totals {
-  const t: Totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
-  for (const e of ctx.sessionManager.getBranch()) {
-    if (e.type === "message" && e.message.role === "assistant") {
-      const m = e.message as AssistantMessage;
-      t.input      += m.usage.input;
-      t.output     += m.usage.output;
-      t.cacheRead  += m.usage.cacheRead  ?? 0;
-      t.cacheWrite += m.usage.cacheWrite ?? 0;
-      t.cost       += m.usage.cost.total ?? 0;
-    }
-  }
-  return t;
+function sumCost(ctx: ExtensionContext): number {
+  let cost = 0;
+  for (const e of ctx.sessionManager.getBranch())
+    if (e.type === "message" && e.message.role === "assistant")
+      cost += (e.message as AssistantMessage).usage.cost.total ?? 0;
+  return cost;
 }
 
-// ── Extension ─────────────────────────────────────────────────────────────────
-
 export default function (pi: ExtensionAPI) {
-  const toolCounts  = new Map<string, number>();
-  let cachedTotals: Totals | undefined;
-  let cachedUsage:  ReturnType<ExtensionContext["getContextUsage"]>;
-  let lastKey       = "";
-  let lastActivityAt = 0;
-  let agentRunning   = false;
+  const toolCounts = new Map<string, number>();
+  let cachedCost: number | undefined;
+  let cachedUsage: ReturnType<ExtensionContext["getContextUsage"]>;
+  let lastKey = "";
+  let lastActivityAt = 0, agentRunning = false;
   let idleTimer: ReturnType<typeof setInterval> | undefined;
   let savedCtx: ExtensionContext | undefined;
-
-  // ── Core update — identical to pi-copy pattern ───────────────────────────
 
   function update(): void {
     if (!savedCtx) return;
     const ctx = savedCtx;
 
-    // row 1 — identity (same structure as pi copy topLeft / topRight)
+    // top: provider  model  (thinking)        project  branch
     const model   = ctx.model;
     const prov    = PROVIDERS[model?.provider ?? ""];
-    const provSeg = prov
-      ? ansi(prov.color, `${prov.icon} ${prov.name}`)
-      : "";
-    const modelId    = model?.id?.toLowerCase() ?? "";
-    const modelLabel = MODELS[modelId] ?? modelId;
-    const modelSeg   = bold("\x1b[38;5;117m", modelLabel || "—");
-    const thinking   = pi.getThinkingLevel();
-    const thinkSeg   = ansi("\x1b[38;5;246m", `(${thinking})`);
+    const topLeft = [
+      prov ? c(prov.color, `${prov.icon} ${prov.name}`) : "",
+      c("\x1b[38;5;117m", MODELS[model?.id?.toLowerCase() ?? ""] ?? model?.id ?? "—"),
+      c("\x1b[38;5;246m", `(${pi.getThinkingLevel()})`),
+    ].filter(Boolean).join("  ");
 
-    const topLeft  = [provSeg, modelSeg, thinkSeg].filter(Boolean).join("  ");
-    const branch   = gitBranch(), dirty = gitDirty();
+    const branch = gitBranch(), dirty = gitDirty();
     const topRight = [
-      ansi("\x1b[38;5;179m", `\uF07B ${basename(ctx.cwd ?? "") || "root"}`),
-      ansi(dirty ? "\x1b[38;5;214m" : "\x1b[38;5;246m", `\uE0A0 ${branch || "no-git"}${dirty}`),
+      c("\x1b[38;5;179m", `\uF07B ${basename(ctx.cwd ?? "") || "root"}`),
+      c(dirty ? "\x1b[38;5;214m" : "\x1b[38;5;246m", `\uE0A0 ${branch || "no-git"}${dirty}`),
     ].join("  ");
 
-    // row 2 — metrics
-    cachedTotals ??= sumTotals(ctx);
-    cachedUsage  ??= ctx.getContextUsage();
-    const t     = cachedTotals;
-    const usage = cachedUsage;
-    const pct   = usage?.percent ?? null;
+    // bottom: $cost  45% (50K/200K)  idle 2m        Bash 3 │ Read 5
+    cachedCost  ??= sumCost(ctx);
+    cachedUsage ??= ctx.getContextUsage();
+    const pct = cachedUsage?.percent ?? null;
+    const pctColor = pct === null || pct < 60 ? "\x1b[38;5;142m" : pct < 80 ? "\x1b[38;5;214m" : "\x1b[38;5;196m";
 
-    const pctColor =
-      pct === null || pct < 60 ? "\x1b[38;5;142m" :
-      pct < 80                 ? "\x1b[38;5;214m" : "\x1b[38;5;196m";
+    const idleMs = !agentRunning && lastActivityAt > 0 ? Date.now() - lastActivityAt : -1;
+    const idleColor =
+      idleMs < 0       ? ""                :
+      idleMs < 180_000 ? "\x1b[38;5;142m" :
+      idleMs < 270_000 ? "\x1b[38;5;214m" :
+      idleMs < 300_000 ? "\x1b[38;5;196m" : "\x1b[38;5;240m";
 
-    const metricsLeft = [
-      ansi("\x1b[38;5;246m", `↑${fmt(t.input)}`),
-      ansi("\x1b[38;5;246m", `↓${fmt(t.output)}`),
-      ansi("\x1b[38;5;240m", `⊕${fmt(t.cacheRead)}`),
-      ansi("\x1b[38;5;240m", `⊗${fmt(t.cacheWrite)}`),
-      ansi("\x1b[38;5;246m", t.cost < 0.01 ? `$${t.cost.toFixed(4)}` : `$${t.cost.toFixed(3)}`),
-      ansi(pctColor, pct !== null ? `${Math.round(pct)}%` : "?%") +
-        " " + ansi("\x1b[38;5;240m", `(${usage?.tokens != null ? fmt(usage.tokens) : "?"}/${usage ? fmt(usage.contextWindow) : "?"})`),
-    ].join("  ");
+    const bottomLeft = [
+      c("\x1b[38;5;246m", cachedCost < 0.01 ? `$${cachedCost.toFixed(4)}` : `$${cachedCost.toFixed(3)}`),
+      pct !== null
+        ? c(pctColor, `${Math.round(pct)}%`) + c("\x1b[38;5;240m", ` (${cachedUsage?.tokens != null ? fmt(cachedUsage.tokens) : "?"}/${cachedUsage ? fmt(cachedUsage.contextWindow) : "?"})`)
+        : "",
+      idleMs >= 0 ? c(idleColor, `idle ${fmtIdle(idleMs)}`) : "",
+    ].filter(Boolean).join("  ");
 
-    // idle time — color against Anthropic 5-min cache TTL
-    const idleMs  = !agentRunning && lastActivityAt > 0 ? Date.now() - lastActivityAt : -1;
-    const idleSeg = idleMs >= 0 ? (() => {
-      const col =
-        idleMs < 180_000 ? "\x1b[38;5;142m" :  // < 3m  green
-        idleMs < 270_000 ? "\x1b[38;5;214m" :  // 3–4.5m orange
-        idleMs < 300_000 ? "\x1b[38;5;196m" :  // 4.5–5m red
-        "\x1b[38;5;240m";                        // > 5m  dim
-      return ansi(col, `idle ${fmtElapsed(idleMs)}`);
-    })() : "";
-
-    const metricsRight = toolCounts.size > 0
-      ? [...toolCounts.entries()].map(([n, c]) => ansi("\x1b[38;5;246m", `${n} ${c}`)).join(ansi("\x1b[38;5;240m", " │ "))
+    const bottomRight = toolCounts.size > 0
+      ? [...toolCounts.entries()].map(([n, cnt]) => c("\x1b[38;5;246m", `${n} ${cnt}`)).join(c("\x1b[38;5;240m", " │ "))
       : "";
 
-    const bottomLeft = idleSeg ? metricsLeft + "  " + idleSeg : metricsLeft;
-
-    // dedup — only call setWidget if something actually changed
-    const key = topLeft + topRight + bottomLeft + metricsRight;
+    const key = topLeft + topRight + bottomLeft + bottomRight;
     if (key === lastKey) return;
     lastKey = key;
 
-    ctx.ui.setWidget("status-top",    [buildLine(topLeft, topRight)],           { placement: "aboveEditor" });
-    ctx.ui.setWidget("status-bottom", [buildLine(bottomLeft, metricsRight)],    { placement: "belowEditor" });
+    ctx.ui.setWidget("status-top",    [buildLine(topLeft, topRight)],       { placement: "aboveEditor" });
+    ctx.ui.setWidget("status-bottom", [buildLine(bottomLeft, bottomRight)], { placement: "belowEditor" });
   }
-
-  // ── Events (same set as pi copy + agent_end for idle) ────────────────────
 
   pi.on("agent_start", () => { agentRunning = true; });
   pi.on("agent_end",   () => { agentRunning = false; lastActivityAt = Date.now(); update(); });
-  pi.on("turn_end",    () => { cachedTotals = cachedUsage = undefined; update(); });
+  pi.on("turn_end",    () => { cachedCost = cachedUsage = undefined; update(); });
   pi.on("model_select",          () => update());
   pi.on("thinking_level_select", () => update());
   pi.on("tool_execution_start",  (event) => {
@@ -196,10 +142,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     savedCtx = ctx;
     toolCounts.clear();
-    cachedTotals = cachedUsage = undefined;
+    cachedCost = cachedUsage = undefined;
     lastActivityAt = 0; agentRunning = false; lastKey = "";
 
-    // Idle timer — only updates idle label, dedup prevents unnecessary setWidget calls
     clearInterval(idleTimer);
     idleTimer = setInterval(() => { if (!agentRunning) update(); }, 30_000);
 
