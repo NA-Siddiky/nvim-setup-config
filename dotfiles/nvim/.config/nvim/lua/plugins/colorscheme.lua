@@ -1,25 +1,5 @@
 return {
   {
-    "folke/tokyonight.nvim",
-    lazy = false,
-    priority = 1000,
-    opts = {},
-    config = function()
-      require("tokyonight").setup({
-        style = "night",
-        transparent = true,
-        styles = {
-          comments = { italic = true },
-          keywords = { italic = true },
-          functions = { italic = true },
-          variables = { italic = true },
-          sidebars = "transparent",
-          floats = "transparent",
-        },
-      })
-    end,
-  },
-  {
     "sainnhe/gruvbox-material",
     config = function()
       vim.g.gruvbox_material_enable_italic = 1
@@ -31,16 +11,7 @@ return {
       -- vim.g.gruvbox_material_cursor = "green"
     end,
   },
-  {
-    "sainnhe/everforest",
-    priority = 1000,
-    config = function()
-      vim.g.everforest_enable_italic = 1
-      vim.g.everforest_better_performance = 1
-      vim.g.everforest_background = "hard"
-      vim.g.everforest_transparent_background = 2
-    end,
-  },
+
   {
     "LazyVim/LazyVim",
     opts = {
