@@ -26,8 +26,5 @@
   "warnings": {
     "anthropicExtraUsage": false
   },
-  "theme": "dark",
-  "packages": [
-    "npm:pi-subagents"
-  ]
+  "theme": "dark"
 }
