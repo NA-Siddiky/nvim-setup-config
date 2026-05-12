@@ -7,3 +7,6 @@ dotfiles/pi/.pi/*/auth*
 dotfiles/pi/.pi/agent/stats.db-wal
 dotfiles/pi/.pi/agent/stats.db-shm
 dotfiles/pi/.pi/agent/stats.db
+
+# PI run history
+dotfiles/pi/.pi/agent/run-history.jsonl
