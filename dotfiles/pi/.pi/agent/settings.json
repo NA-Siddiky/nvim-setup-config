@@ -1,12 +1,13 @@
 {
   "lastChangelogVersion": "0.74.0",
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-4-6",
-  "defaultThinkingLevel": "medium",
+  "defaultProvider": "groq",
+  "defaultModel": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "defaultThinkingLevel": "off",
   "enabledModels": [
     "google/gemini-3.1-flash-lite-preview",
     "openai-codex/gpt-5.5",
-    "anthropic/claude-sonnet-4-6"
+    "anthropic/claude-sonnet-4-6",
+    "groq/meta-llama/llama-4-scout-17b-16e-instruct"
   ],
   "compaction": {
     "enabled": true
