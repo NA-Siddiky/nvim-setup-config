@@ -3,6 +3,15 @@ node_modules/
 dotfiles/pi/.pi/*/sessions/*
 dotfiles/pi/.pi/*/auth*
 
+# pi copy (never track)
+dotfiles/pi copy/
+
+# Broad safety net
+**/auth.json
+**/.pi/agent/sessions/
+**/.pi/agent/stats.db*
+**/.pi/agent/run-history.jsonl
+
 # PI stats database
 dotfiles/pi/.pi/agent/stats.db-wal
 dotfiles/pi/.pi/agent/stats.db-shm
