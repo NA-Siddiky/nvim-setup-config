@@ -22,11 +22,29 @@ const FAST_MODEL_ID = "gemini-3.1-flash-lite-preview";
 export default function (pi: ExtensionAPI) {
   let commitInProgress = false;
   let previousModel: Model | undefined;
+  let preCommitLeafId: string | null | undefined;
 
-  // When the agent finishes, restore the previous model (if we switched for a commit)
+  // Strip full session history for commit turns — only the commit prompt goes to the model
+  pi.on("context", async (event, _ctx) => {
+    if (!commitInProgress) return;
+    const last = [...event.messages].reverse().find(m => m.role === "user");
+    return { messages: last ? [last] : [] };
+  });
+
+  // When the agent finishes: prune commit turn from session, restore model
   pi.on("agent_end", async (_event, ctx) => {
     if (!commitInProgress) return;
     commitInProgress = false;
+
+    // Orphan all commit-turn entries — branch back to pre-commit leaf
+    if (preCommitLeafId !== undefined) {
+      if (preCommitLeafId === null) {
+        ctx.sessionManager.resetLeaf();
+      } else {
+        ctx.sessionManager.branch(preCommitLeafId);
+      }
+      preCommitLeafId = undefined;
+    }
 
     if (previousModel) {
       const restored = previousModel;
@@ -55,6 +73,9 @@ export default function (pi: ExtensionAPI) {
         );
         return;
       }
+
+      // Snapshot leaf before anything is written — used to prune commit turn later
+      preCommitLeafId = ctx.sessionManager.getLeafId();
 
       // Save current model so we can restore it after the commit
       previousModel = ctx.model;
