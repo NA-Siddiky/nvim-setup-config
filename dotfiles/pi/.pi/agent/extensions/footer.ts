@@ -56,6 +56,8 @@ const MODELS: Record<string, string> = {
   "gemini-3.1-flash-lite-preview": "Gemini 3.1 FL",
 };
 
+let isGitRepo: boolean | undefined = undefined;
+
 function gitCache(
   cmd: string,
   ttl: number,
@@ -65,12 +67,16 @@ function gitCache(
   let v = fallback,
     t = 0;
   return () => {
+    if (isGitRepo === false) return fallback;
     const now = Date.now();
     if (now - t < ttl) return v;
     t = now;
     try {
       v = tx(execSync(cmd, { encoding: "utf8" }).trim());
-    } catch {
+      isGitRepo = true;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("not a git repository")) isGitRepo = false;
       v = fallback;
     }
     return v;
@@ -82,9 +88,21 @@ const gitBranch = gitCache(
   "",
   (s) => s,
 );
-const gitDirty = gitCache("git status --porcelain", 1_500, "", (s) =>
-  s ? "*" : "",
-);
+function parseGitStatus(s: string): string {
+  if (!s) return "";
+  let staged = 0, unstaged = 0;
+  for (const line of s.split("\n").filter(Boolean)) {
+    const x = line[0], y = line[1];
+    if (x === "?" && y === "?") continue;
+    if (x !== " ") staged++;
+    if (y !== " ") unstaged++;
+  }
+  const parts: string[] = [];
+  if (staged)   parts.push(`\uF067${staged}`);   // nf  staged
+  if (unstaged) parts.push(`\uF040${unstaged}`); // nf  unstaged
+  return parts.join(" ");
+}
+const gitDirty = gitCache("git status --porcelain", 10_000, "", parseGitStatus);
 
 interface Totals {
   input: number;
@@ -92,21 +110,9 @@ interface Totals {
   cost: number;
 }
 
-function sumTotals(ctx: ExtensionContext): Totals {
-  const t: Totals = { input: 0, output: 0, cost: 0 };
-  for (const e of ctx.sessionManager.getBranch())
-    if (e.type === "message" && e.message.role === "assistant") {
-      const u = (e.message as AssistantMessage).usage;
-      t.input += u.input;
-      t.output += u.output;
-      t.cost += u.cost.total ?? 0;
-    }
-  return t;
-}
-
 export default function (pi: ExtensionAPI) {
   const toolCounts = new Map<string, number>();
-  let cachedTotals: Totals | undefined;
+  let runningTotals: Totals = { input: 0, output: 0, cost: 0 };
   let cachedUsage: ReturnType<ExtensionContext["getContextUsage"]>;
   let lastKey = "";
   let lastActivityAt = 0,
@@ -136,16 +142,13 @@ export default function (pi: ExtensionAPI) {
       dirty = gitDirty();
     const topRight = [
       c("\x1b[38;5;179m", `\uF07B ${basename(ctx.cwd ?? "") || "root"}`),
-      c(
-        dirty ? "\x1b[38;5;214m" : "\x1b[38;5;246m",
-        `\uE0A0 ${branch || "no-git"}${dirty}`,
-      ),
+      c("\x1b[38;5;246m", `\uE0A0 ${branch || "no-git"}`)
+        + (dirty ? " " + c("\x1b[38;5;214m", dirty) : ""),
     ].join(sep);
 
     // bottom: $cost  45% (50K/200K)  idle 2m        Bash 3 │ Read 5
-    cachedTotals ??= sumTotals(ctx);
     cachedUsage ??= ctx.getContextUsage();
-    const t = cachedTotals;
+    const t = runningTotals;
     const pct = cachedUsage?.percent ?? null;
     const pctColor =
       pct === null || pct < 60
@@ -202,7 +205,7 @@ export default function (pi: ExtensionAPI) {
     });
     ctx.ui.setWidget(
       "status-bottom",
-      [buildLine(bottomLeft, bottomRight), " "],
+      [buildLine(bottomLeft, bottomRight), ""],
       { placement: "belowEditor" },
     );
   }
@@ -215,8 +218,16 @@ export default function (pi: ExtensionAPI) {
     lastActivityAt = Date.now();
     update();
   });
+  pi.on("message_end", (event) => {
+    if (event.message.role !== "assistant") return;
+    const u = (event.message as AssistantMessage).usage;
+    if (!u) return;
+    runningTotals.input  += u.input        ?? 0;
+    runningTotals.output += u.output       ?? 0;
+    runningTotals.cost   += u.cost?.total  ?? 0;
+  });
   pi.on("turn_end", () => {
-    cachedTotals = cachedUsage = undefined;
+    cachedUsage = undefined;
     update();
   });
   pi.on("model_select", () => update());
@@ -228,15 +239,18 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     clearInterval(idleTimer);
     idleTimer = undefined;
+    savedCtx = undefined;
   });
 
   pi.on("session_start", (_event, ctx) => {
     savedCtx = ctx;
     toolCounts.clear();
-    cachedTotals = cachedUsage = undefined;
+    runningTotals = { input: 0, output: 0, cost: 0 };
+    cachedUsage = undefined;
     lastActivityAt = Date.now();
     agentRunning = false;
     lastKey = "";
+    isGitRepo = undefined;
 
     clearInterval(idleTimer);
     idleTimer = setInterval(() => {

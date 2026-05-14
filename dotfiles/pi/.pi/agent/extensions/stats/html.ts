@@ -1,341 +1,561 @@
 /**
- * html.ts — self-contained HTML report
- * No external dependencies. Dark, monospace, every field visible.
+ * html.ts — gruvbox redesign with period toggle, theme toggle, and social share card.
+ * Data is injected as window.__STATS_DATA__; React app reads it at runtime.
  */
 
 import type {
-  DailyStat, DurationBucket, ModelEfficiency, ModelStat,
-  OverallStats, ProjectStat, RecentSession, TokenWasteEntry,
-  ToolStat, WeeklyStat,
+  DailyStat,
+  DurationBucket,
+  ModelEfficiency,
+  ModelStat,
+  OverallStats,
+  ProjectStat,
+  RecentSession,
+  TokenWasteEntry,
+  ToolStat,
+  WeeklyStat,
 } from "./db.js";
-import { fmtTokens, fmtCost, fmtMs, fmtDate, escHtml } from "./format.js";
+import { fmtMs, fmtDate } from "./format.js";
+import { GRUVBOX_CSS } from "./themes/gruvbox.css.js";
 
 export interface ReportData {
   generatedAt: string;
-  today:       WeeklyStat;
-  week:        WeeklyStat;
-  overall:     OverallStats;
-  tools:       ToolStat[];
-  models:      ModelStat[];
-  efficiency:  ModelEfficiency[];
-  projects:    ProjectStat[];
-  daily:       DailyStat[];
-  recent:      RecentSession[];
-  histogram:   DurationBucket[];
-  waste:       TokenWasteEntry[];
-  streak:      number;
-  toolless:    { total: number; toolless: number };
+  today: WeeklyStat;
+  week: WeeklyStat;
+  overall: OverallStats;
+  tools: ToolStat[];
+  models: ModelStat[];
+  efficiency: ModelEfficiency[];
+  projects: ProjectStat[];
+  daily: DailyStat[];
+  recent: RecentSession[];
+  histogram: DurationBucket[];
+  waste: TokenWasteEntry[];
+  streak: number;
+  toolless: { total: number; toolless: number };
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function bar(value: number, max: number): string {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return `<div style="width:${pct}%;height:3px;background:#d4a017;border-radius:2px;min-width:${pct > 0 ? 2 : 0}px"></div>`;
-}
-
-function th(...cols: string[]): string {
-  return `<tr>${cols.map(c => `<th>${escHtml(c)}</th>`).join("")}</tr>`;
-}
-
-function spark(daily: DailyStat[]): string {
-  if (daily.length < 2) return "<span style='color:#504945'>no data</span>";
-  const max = Math.max(...daily.map(d => d.tokens), 1);
-  const blocks = ["▁","▂","▃","▄","▅","▆","▇","█"];
-  return daily.map(d => {
-    const i = Math.min(7, Math.floor((d.tokens / max) * 8));
-    const col = d.tokens > max * 0.7 ? "#d4a017" : d.tokens > max * 0.3 ? "#b8bb26" : "#928374";
-    return `<span style="color:${col}" title="${d.day}: ${fmtTokens(d.tokens)}">${blocks[i]}</span>`;
-  }).join("");
-}
-
-// ── CSS ───────────────────────────────────────────────────────────────────────
-
-const CSS = `
-:root {
-  --bg: #1d2021; --fg: #ebdbb2; --box: #282828;
-  --dim: #928374; --acc: #d4a017; --grn: #b8bb26; --blu: #83a598; --org: #fe8019;
-}
-.light-mode {
-  --bg: #fbf1c7; --fg: #3c3836; --box: #ebdbb2; --dim: #7c6f64;
-}
-body{background:var(--bg);color:var(--fg);font:13px/1.6 ui-monospace,monospace;padding:32px;max-width:900px;margin:auto;transition:background 0.3s,color 0.3s}
-
-h1{font-size:24px;margin:0}
-h2{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin:24px 0 12px}
-.box{background:var(--box);border-radius:8px;padding:20px;margin-bottom:16px}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:16px}
-.row{display:flex;gap:24px;flex-wrap:wrap}
-.stat-val{font-size:20px;font-weight:700}
-.stat-sub{font-size:10px;text-transform:uppercase;color:var(--dim)}
-.scroll-wrap{overflow-x:auto;max-height:400px;overflow-y:auto;border-radius:4px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{text-align:left;padding:8px;font-size:10px;color:var(--dim);border-bottom:1px solid rgba(0,0,0,0.1)}
-td{padding:8px;border-bottom:1px solid rgba(0,0,0,0.05)}
-.r{text-align:right}.num{font-variant-numeric:tabular-nums}.dim{color:var(--dim)}.acc{color:var(--acc)}.blu{color:var(--blu)}.grn{color:var(--grn)}.org{color:var(--org)}
-.summary-card {
-  background: var(--box);
-  padding: 32px;
-  border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.1);
-}
-.theme-toggle {
-  cursor: pointer;
-  background: none;
-  border: 1px solid var(--dim);
-  color: var(--dim);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-}
-`;
-
-// ── Builder ───────────────────────────────────────────────────────────────────
 
 export function buildHtml(d: ReportData): string {
-  const maxTool = d.tools[0]?.total ?? 1;
-  const maxProj = d.projects[0]?.inputs ?? 1;
-  const maxHist = Math.max(...d.histogram.map(b => b.count), 1);
-  const chatOnlyPct = d.toolless.total > 0
-    ? Math.round((d.toolless.toolless / d.toolless.total) * 100)
-    : 0;
+  const chatOnlyPct =
+    d.toolless.total > 0
+      ? Math.round((d.toolless.toolless / d.toolless.total) * 100)
+      : 0;
+
+  const injected = JSON.stringify({
+    today: {
+      inputs: d.today.inputs,
+      sessions: d.today.sessions,
+      tokens: d.today.tokens,
+      cost: d.today.cost,
+      activeMs: d.today.timeMs,
+      streakDays: d.streak,
+      chatOnlyPct,
+    },
+    week: {
+      inputs: d.week.inputs,
+      sessions: d.week.sessions,
+      tokens: d.week.tokens,
+      cost: d.week.cost,
+      activeMs: d.week.timeMs,
+      streakDays: d.streak,
+      chatOnlyPct,
+    },
+    overall: {
+      sessions: d.overall.totalSessions,
+      inputs: d.overall.totalInputs,
+      turns: d.overall.totalTurns,
+      tokens: d.overall.totalTokens,
+      cost: d.overall.totalCost,
+    },
+    tools: d.tools.map((t) => ({ name: t.tool, uses: t.total })),
+    models: d.efficiency.map((e) => ({
+      provider: e.provider,
+      model: e.model_id,
+      inputs: e.inputs,
+      avgTok: e.avgTokens,
+      avgTime: e.avgTimeSec,
+      costIn: e.costPerInput,
+      total: e.totalCost,
+    })),
+    projects: d.projects.map((p) => ({ name: p.project, inputs: p.inputs })),
+    response: d.histogram.map((b) => ({ b: b.label, n: b.count })),
+    daily: d.daily.map((day) => [day.day, day.tokens] as [string, number]),
+    recent: d.recent.map((s) => ({
+      date: fmtDate(s.started_at),
+      project: s.cwd?.split("/").pop() ?? "—",
+      inputs: s.inputs ?? 0,
+      turns: s.turns,
+      tokens: s.tokens,
+      cost: s.cost,
+      dur: fmtMs(s.duration ?? 0),
+    })),
+    highToken: d.waste.map((w) => ({
+      date: fmtDate(w.started_at),
+      provider: w.provider,
+      model: w.model_id,
+      tokens: w.tokens_used,
+      time: fmtMs(w.time_ms),
+    })),
+    generatedAt: d.generatedAt,
+  });
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>π stats</title>
-<style>${CSS}</style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>${GRUVBOX_CSS}</style>
 </head>
 <body>
-<div id="summary-card" class="summary-card">
-  <h1 style="margin-bottom:16px">π stats summary</h1>
-  <div class="row">
-    <div class="stat"><div class="stat-val">${d.today.inputs}</div><div class="stat-sub">inputs (today)</div></div>
-    <div class="stat"><div class="stat-val">${fmtTokens(d.today.tokens)}</div><div class="stat-sub">tokens (today)</div></div>
-    <div class="stat"><div class="stat-val">${d.streak}d</div><div class="stat-sub">streak</div></div>
-  </div>
-</div>
+<div id="root"></div>
+<script>window.__STATS_DATA__ = ${injected};</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/html-to-image@1.11.13/dist/html-to-image.js"></script>
+<script type="text/babel">
+/* π stats — gruvbox redesign */
+const { useState, useRef, useEffect } = React;
+const D = window.__STATS_DATA__;
 
-<div style="display: flex; gap: 12px; margin: 24px 0;">
-  <button id="share-btn" style="background:var(--acc);color:var(--bg);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:bold;">Share Summary</button>
-  <button id="theme-btn" class="theme-toggle">Toggle Theme</button>
-</div>
+/* ---------- HELPERS ---------- */
+const fmtNum = n => {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
+  if (n >= 1_000)     return (n / 1_000).toFixed(n >= 10_000 ? 0 : 1).replace(/\\.0$/, "") + "k";
+  return String(n);
+};
+const fmt$ = n => "$" + n.toFixed(2);
+const fmtTime = ms => {
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  if (h) return h + "h " + m + "m";
+  if (m) return m + "m " + ss + "s";
+  return ss + "s";
+};
 
-<div class="box" style="margin-bottom:16px">
-  <div class="row">
-    <div class="stat"><div class="stat-val">${d.today.inputs}</div><div class="stat-sub">inputs</div></div>
-    <div class="stat"><div class="stat-val">${d.today.sessions}</div><div class="stat-sub">sessions</div></div>
-    <div class="stat"><div class="stat-val">${fmtTokens(d.today.tokens)}</div><div class="stat-sub">tokens</div></div>
-    <div class="stat"><div class="stat-val acc">${fmtCost(d.today.cost)}</div><div class="stat-sub">cost</div></div>
-    <div class="stat"><div class="stat-val dim">${fmtMs(d.today.timeMs)}</div><div class="stat-sub">active time</div></div>
-  </div>
-</div>
-
-<h2>This Week</h2>
-<div class="box" style="margin-bottom:16px">
-  <div class="row">
-    <div class="stat"><div class="stat-val">${d.week.inputs}</div><div class="stat-sub">inputs</div></div>
-    <div class="stat"><div class="stat-val">${d.week.sessions}</div><div class="stat-sub">sessions</div></div>
-    <div class="stat"><div class="stat-val">${fmtTokens(d.week.tokens)}</div><div class="stat-sub">tokens</div></div>
-    <div class="stat"><div class="stat-val acc">${fmtCost(d.week.cost)}</div><div class="stat-sub">cost</div></div>
-    <div class="stat"><div class="stat-val dim">${fmtMs(d.week.timeMs)}</div><div class="stat-sub">active time</div></div>
-    ${d.streak > 0 ? `<div class="stat"><div class="stat-val org">${d.streak}d</div><div class="stat-sub">streak</div></div>` : ""}
-    <div class="stat"><div class="stat-val dim">${chatOnlyPct}%</div><div class="stat-sub">chat-only</div></div>
-  </div>
-</div>
-
-<div class="grid2">
-
-  <div>
-    <h2>Tools (7 days)</h2>
-    <div class="box">
-      <div class="scroll-wrap">
-        <table>
-          <thead>${th("tool", "uses", "")}</thead>
-          <tbody>
-            ${d.tools.length ? d.tools.map(t => `<tr>
-              <td>${escHtml(t.tool)}</td>
-              <td class="r num blu">${t.total}</td>
-              <td class="bar-cell">${bar(t.total, maxTool)}</td>
-            </tr>`).join("") : `<tr><td colspan="3" class="dim">no data</td></tr>`}
-          </tbody>
-        </table>
-      </div>
+/* ---------- COMPONENTS ---------- */
+function Brand({ small }) {
+  return (
+    <div className={"brand " + (small ? "brand-sm" : "")}>
+      <span className="pi">π</span>
+      <span className="brand-name">stats</span>
     </div>
-  </div>
+  );
+}
 
-  <div>
-    <h2>Models (7 days)</h2>
-    <div class="box">
-      <div class="scroll-wrap">
-        <table>
-          <thead>${th("provider", "model", "inputs", "cost", "tokens")}</thead>
-          <tbody>
-            ${d.models.length ? d.models.map(m => `<tr>
-              <td class="dim">${escHtml(m.provider)}</td>
-              <td>${escHtml(m.model_id)}</td>
-              <td class="r num">${m.uses}</td>
-              <td class="r num grn">—</td>
-              <td class="r num dim">—</td>
-            </tr>`).join("") : `<tr><td colspan="5" class="dim">no data</td></tr>`}
-          </tbody>
-        </table>
-      </div>
+function SegToggle({ value, onChange, options }) {
+  return (
+    <div className="seg">
+      {options.map(o => (
+        <button key={o.v} className={"seg-btn " + (value === o.v ? "on" : "")} onClick={() => onChange(o.v)}>
+          {o.label}
+        </button>
+      ))}
     </div>
-  </div>
+  );
+}
 
-</div>
+function IconBtn({ children, onClick, title, accent }) {
+  return (
+    <button className={"icon-btn " + (accent ? "accent" : "")} onClick={onClick} title={title}>
+      {children}
+    </button>
+  );
+}
 
-<h2>Model Efficiency</h2>
-<div class="box">
-  <div class="scroll-wrap">
-    <table>
-      <thead>${th("provider", "model", "inputs", "avg tokens", "avg time", "$/input", "total cost")}</thead>
-      <tbody>
-        ${d.efficiency.length ? d.efficiency.map(e => `<tr>
-          <td class="dim">${escHtml(e.provider)}</td>
-          <td>${escHtml(e.model_id)}</td>
-          <td class="r num">${e.inputs}</td>
-          <td class="r num dim">${fmtTokens(e.avgTokens)}</td>
-          <td class="r num dim">${e.avgTimeSec}s</td>
-          <td class="r num dim">${fmtCost(e.costPerInput)}</td>
-          <td class="r num grn">${fmtCost(e.totalCost)}</td>
-        </tr>`).join("") : `<tr><td colspan="7" class="dim">no data</td></tr>`}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="grid2" style="margin-top:4px">
-
-  <div>
-    <h2>Projects</h2>
-    <div class="box">
-      <div class="scroll-wrap">
-        <table>
-          <thead>${th("project", "inputs", "")}</thead>
-          <tbody>
-            ${d.projects.length ? d.projects.map(p => `<tr>
-              <td>${escHtml(p.project)}</td>
-              <td class="r num">${p.inputs}</td>
-              <td class="bar-cell">${bar(p.inputs, maxProj)}</td>
-            </tr>`).join("") : `<tr><td colspan="3" class="dim">no data</td></tr>`}
-          </tbody>
-        </table>
+function Hero({ period, data }) {
+  const stats = [
+    { label: "inputs",   value: fmtNum(data.inputs),    hi: false, accent: false },
+    { label: "sessions", value: String(data.sessions),  hi: false, accent: false },
+    { label: "tokens",   value: fmtNum(data.tokens),    hi: false, accent: false },
+    { label: "cost",     value: fmt$(data.cost),         hi: true,  accent: false },
+    { label: "active",   value: fmtTime(data.activeMs), hi: false, accent: false },
+    { label: "streak",   value: data.streakDays + "d",  hi: false, accent: true  },
+  ];
+  return (
+    <section className="hero">
+      <div className="hero-head">
+        <div className="eyebrow">{period === "today" ? "today's usage" : "this week"}</div>
+        <div className="hero-date">
+          {new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+        </div>
       </div>
-    </div>
-  </div>
-
-  <div>
-    <h2>Response Time Distribution</h2>
-    <div class="box">
-      <div class="scroll-wrap">
-        <table>
-          <thead>${th("bucket", "count", "")}</thead>
-          <tbody>
-            ${d.histogram.map(b => `<tr>
-              <td class="dim">${escHtml(b.label)}</td>
-              <td class="r num">${b.count}</td>
-              <td class="bar-cell">${bar(b.count, maxHist)}</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
+      <div className="hero-grid">
+        {stats.map(s => (
+          <div key={s.label} className={"stat " + (s.hi ? "stat-hi " : "") + (s.accent ? "stat-accent " : "")}>
+            <div className="stat-val">{s.value}</div>
+            <div className="stat-lbl">{s.label}</div>
+          </div>
+        ))}
       </div>
+    </section>
+  );
+}
+
+function BarList({ rows, max, accent = "yellow" }) {
+  return (
+    <ul className="bar-list">
+      {rows.map(r => {
+        const pct = Math.max(2, (r.value / max) * 100);
+        return (
+          <li key={r.label} className="bar-row">
+            <div className="bar-label">{r.label}</div>
+            <div className="bar-track">
+              <div className={"bar-fill bar-" + accent} style={{ width: pct + "%" }} />
+            </div>
+            <div className="bar-value">{r.value}</div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Card({ title, hint, children, span, scroll }) {
+  return (
+    <section className="card" style={{ gridColumn: span ? "span " + span : undefined }}>
+      <header className="card-head">
+        <h3>{title}</h3>
+        {hint && <span className="card-hint">{hint}</span>}
+      </header>
+      <div className={"card-body " + (scroll ? "scroll" : "")}>{children}</div>
+    </section>
+  );
+}
+
+function DailyChart({ data }) {
+  const max = Math.max(...data.map(d => d[1]));
+  return (
+    <div className="daily-chart">
+      {data.map(([d, v], i) => {
+        const h = Math.max(3, (v / max) * 100);
+        const isToday = i === data.length - 1;
+        return (
+          <div className="dc-col" key={d} title={d + ": " + fmtNum(v) + " tokens"}>
+            <div className={"dc-bar " + (isToday ? "today" : "")} style={{ height: h + "%" }} />
+          </div>
+        );
+      })}
     </div>
-  </div>
+  );
+}
 
-</div>
-
-<h2>Daily Token Usage (30 days)</h2>
-<div class="box">
-  <div style="margin-bottom:10px;font-size:18px;letter-spacing:1px">${spark(d.daily)}</div>
-  <div class="scroll-wrap">
-    <table>
-      <thead>${th("date", "inputs", "sessions", "tokens")}</thead>
-      <tbody>
-        ${d.daily.length ? d.daily.slice().reverse().slice(0, 14).map(day => `<tr>
-          <td class="dim">${escHtml(day.day)}</td>
-          <td class="r num">${day.inputs}</td>
-          <td class="r num dim">${day.sessions}</td>
-          <td class="r num">${fmtTokens(day.tokens)}</td>
-        </tr>`).join("") : `<tr><td colspan="4" class="dim">no data</td></tr>`}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<h2>Recent Sessions</h2>
-<div class="box">
-  <div class="scroll-wrap">
-    <table>
-      <thead>${th("date", "project", "inputs", "turns", "tokens", "cost", "duration")}</thead>
-      <tbody>
-        ${d.recent.length ? d.recent.map(s => `<tr>
-          <td class="dim">${escHtml(fmtDate(s.started_at))}</td>
-          <td>${escHtml(s.cwd?.split("/").pop() ?? "—")}</td>
-          <td class="r num">${s.inputs ?? 0}</td>
-          <td class="r num dim">${s.turns}</td>
-          <td class="r num">${fmtTokens(s.tokens)}</td>
-          <td class="r num grn">${fmtCost(s.cost)}</td>
-          <td class="r num dim">${fmtMs(s.duration ?? 0)}</td>
-        </tr>`).join("") : `<tr><td colspan="7" class="dim">no data</td></tr>`}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-${d.waste.length ? `
-<h2>High-Token No-Tool Inputs</h2>
-<div class="box">
-  <div class="scroll-wrap">
-    <table>
-      <thead>${th("date", "provider", "model", "tokens", "time")}</thead>
-      <tbody>
-        ${d.waste.map(w => `<tr>
-          <td class="dim">${escHtml(fmtDate(w.started_at))}</td>
-          <td class="dim">${escHtml(w.provider)}</td>
-          <td>${escHtml(w.model_id)}</td>
-          <td class="r num org">${fmtTokens(w.tokens_used)}</td>
-          <td class="r num dim">${fmtMs(w.time_ms)}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>
-  </div>
-</div>` : ""}
-
-<h2>All-time</h2>
-<div class="box">
-  <div class="row">
-    <div class="stat"><div class="stat-val">${d.overall.totalSessions}</div><div class="stat-sub">sessions</div></div>
-    <div class="stat"><div class="stat-val">${d.overall.totalInputs}</div><div class="stat-sub">inputs</div></div>
-    <div class="stat"><div class="stat-val">${d.overall.totalTurns}</div><div class="stat-sub">turns</div></div>
-    <div class="stat"><div class="stat-val">${fmtTokens(d.overall.totalTokens)}</div><div class="stat-sub">tokens</div></div>
-    <div class="stat"><div class="stat-val acc">${fmtCost(d.overall.totalCost)}</div><div class="stat-sub">cost</div></div>
-  </div>
-</div>
-</div> <!-- end capture-area -->
-
-<div class="meta">π stats · ${escHtml(d.generatedAt)}</div>
-<script>
-// Theme Toggle
-document.getElementById('theme-btn').addEventListener('click', () => {
-  document.documentElement.classList.toggle('light-mode');
-});
-
-// Curated Share
-document.getElementById('share-btn').addEventListener('click', () => {
-  const isLight = document.documentElement.classList.contains('light-mode');
-  const bg = isLight ? '#fbf1c7' : '#282828';
-  html2canvas(document.getElementById('summary-card'), { backgroundColor: bg }).then(canvas => {
-    const link = document.createElement('a');
-    link.download = 'pi-summary.png';
-    link.href = canvas.toDataURL();
-    link.click();
+function last7Days() {
+  const tail = D.daily.slice(-7);
+  return tail.map(([dateStr, tokens], i) => {
+    const dt = new Date(dateStr);
+    const dow = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dt.getDay()];
+    return { date: dateStr, dow, tokens, isToday: i === tail.length - 1 };
   });
-});
+}
+
+function ShareCard({ period, data, theme }) {
+  const topModel = D.models[0] || { model: "—", inputs: 0, total: 0 };
+  const date = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  const days = last7Days();
+  const maxDay = Math.max(...days.map(d => d.tokens), 1);
+  const tier = v => {
+    if (v >= 1_500_000) return "peak";
+    if (v >= 700_000)   return "high";
+    if (v >= 200_000)   return "mid";
+    return "low";
+  };
+  const modelName = topModel.model.replace(/^claude-/, "claude ").replace(/-([0-9])/, " $1");
+  const title = period === "today" ? "Today's Usage" : "Weekly Usage";
+
+  return (
+    <div className={"share-card share-" + theme}>
+      <div className="sc-glow" />
+      <div className="sc-panel">
+        <div className="sc-brand">
+          <div className="sc-brand-mark">π</div>
+          <div className="sc-brand-name">AI Stats</div>
+        </div>
+        <h1 className="sc-title">{title}</h1>
+        <div className="sc-rule" />
+        <div className="sc-pair">
+          <div className="sc-pair-col">
+            <div className="sc-pair-lbl">Total Tokens</div>
+            <div className="sc-pair-val sc-yellow">{fmtNum(data.tokens)}</div>
+            <div className="sc-pair-sub">{period === "today" ? "today" : "this week"}</div>
+          </div>
+          <div className="sc-pair-col">
+            <div className="sc-pair-lbl">
+              <span>Top Model</span>
+              <svg className="sc-chip" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+            </div>
+            <div className="sc-pair-val sc-orange">{modelName}</div>
+            <div className="sc-pair-sub">{topModel.inputs} inputs · {fmt$(topModel.total)}</div>
+          </div>
+        </div>
+        <div className="sc-pills">
+          <div className="sc-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+            <span className="sc-pill-lbl">Inputs:</span>
+            <span className="sc-pill-val">{data.inputs}</span>
+          </div>
+          <div className="sc-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            <span className="sc-pill-lbl">Cost:</span>
+            <span className="sc-pill-val">{fmt$(data.cost)}</span>
+          </div>
+        </div>
+        <div className="sc-chart-h">Weekly Activity</div>
+        <div className="sc-chart">
+          {days.map(d => {
+            const h = Math.max(8, (d.tokens / maxDay) * 100);
+            return (
+              <div className="sc-bar-col" key={d.date}>
+                <div className="sc-bar-val">{fmtNum(d.tokens)}</div>
+                <div className={"sc-bar sc-bar-" + tier(d.tokens) + (d.isToday ? " sc-bar-today" : "")} style={{ height: h + "%" }} />
+                <div className="sc-bar-dow">{d.dow}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="sc-foot">
+          <div className="sc-foot-l">{date}</div>
+          <div className="sc-foot-r">π stats · {data.streakDays}d streak</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareModal({ open, onClose, period, data, theme }) {
+  const cardRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  if (!open) return null;
+
+  const download = async () => {
+    setBusy(true);
+    try {
+      const node = cardRef.current.querySelector(".share-card");
+      const dataUrl = await window.htmlToImage.toPng(node, {
+        pixelRatio: 2,
+        cacheBust: true,
+        backgroundColor: theme === "light" ? "#fbf1c7" : "#1d2021",
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "pi-stats-" + period + "-" + new Date().toISOString().slice(0, 10) + ".png";
+      a.click();
+    } catch (e) {
+      alert("Couldn't generate image: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-veil" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <header className="modal-head">
+          <div>
+            <h2>share summary</h2>
+            <p>1080 × 1080 · ready for socials</p>
+          </div>
+          <div className="modal-actions">
+            <button className="btn ghost" onClick={onClose}>close</button>
+            <button className="btn primary" onClick={download} disabled={busy}>
+              {busy ? "rendering…" : "download .png"}
+            </button>
+          </div>
+        </header>
+        <div className="modal-body" ref={cardRef}>
+          <div className="share-wrap">
+            <ShareCard period={period} data={data} theme={theme} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- APP ---------- */
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem("pi.theme") || "dark");
+  const [period, setPeriod] = useState(() => localStorage.getItem("pi.period") || "today");
+  const [shareOpen, setShareOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("pi.theme", theme);
+  }, [theme]);
+  useEffect(() => { localStorage.setItem("pi.period", period); }, [period]);
+
+  const data = period === "today" ? D.today : D.week;
+  const toolMax  = Math.max(...D.tools.map(t => t.uses), 1);
+  const projMax  = Math.max(...D.projects.map(p => p.inputs), 1);
+  const respMax  = Math.max(...D.response.map(r => r.n), 1);
+
+  return (
+    <div className="page">
+      {/* TOP BAR */}
+      <header className="topbar">
+        <div className="topbar-l">
+          <Brand />
+          <span className="dot">·</span>
+          <span className="muted">ai usage</span>
+        </div>
+        <div className="topbar-r">
+          <SegToggle
+            value={period}
+            onChange={setPeriod}
+            options={[{ v: "today", label: "today" }, { v: "week", label: "week" }]}
+          />
+          <IconBtn onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="toggle theme">
+            {theme === "dark" ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            )}
+            <span className="icon-btn-lbl">{theme}</span>
+          </IconBtn>
+          <IconBtn onClick={() => setShareOpen(true)} title="share" accent>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            <span className="icon-btn-lbl">share</span>
+          </IconBtn>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <Hero period={period} data={data} />
+
+      {/* MAIN GRID */}
+      <main className="grid">
+        <Card title="tools" hint="7 days" span={4}>
+          <BarList accent="yellow" max={toolMax} rows={D.tools.map(t => ({ label: t.name, value: t.uses }))} />
+        </Card>
+
+        <Card title="response times" hint="7 days" span={4}>
+          <BarList accent="aqua" max={respMax} rows={D.response.map(r => ({ label: r.b, value: r.n }))} />
+        </Card>
+
+        <Card title="projects" hint="all-time" span={4} scroll>
+          <BarList accent="orange" max={projMax} rows={D.projects.map(p => ({ label: p.name, value: p.inputs }))} />
+        </Card>
+
+        {D.daily.length > 0 && (
+          <Card title="daily token usage" hint={"last " + D.daily.length + " days"} span={12}>
+            <div className="daily-wrap">
+              <DailyChart data={D.daily} />
+              <div className="daily-axis">
+                <span>{D.daily[0][0]}</span>
+                <span className="muted">peak {fmtNum(Math.max(...D.daily.map(d => d[1])))}</span>
+                <span>{D.daily[D.daily.length - 1][0]}</span>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {D.models.length > 0 && (
+          <Card title="models" hint="ranked by inputs" span={12}>
+            <div className="t-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>provider</th><th>model</th>
+                    <th className="r">inputs</th>
+                    <th className="r">avg tok</th>
+                    <th className="r">avg time</th>
+                    <th className="r">$/inp</th>
+                    <th className="r">total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {D.models.map((m, i) => (
+                    <tr key={i}>
+                      <td className="muted">{m.provider}</td>
+                      <td>{m.model}</td>
+                      <td className="r">{m.inputs}</td>
+                      <td className="r">{fmtNum(m.avgTok)}</td>
+                      <td className="r">{m.avgTime.toFixed(1)}s</td>
+                      <td className="r">{m.costIn < 0.01 && m.costIn > 0 ? "<$0.01" : fmt$(m.costIn)}</td>
+                      <td className="r cost">{fmt$(m.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {D.recent.length > 0 && (
+          <Card title="recent sessions" span={7}>
+            <div className="t-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr><th>date</th><th>project</th><th className="r">turns</th><th className="r">tokens</th><th className="r">cost</th><th className="r">dur</th></tr>
+                </thead>
+                <tbody>
+                  {D.recent.map((r, i) => (
+                    <tr key={i}>
+                      <td className="muted">{r.date}</td>
+                      <td>{r.project}</td>
+                      <td className="r">{r.turns}</td>
+                      <td className="r">{fmtNum(r.tokens)}</td>
+                      <td className="r cost">{fmt$(r.cost)}</td>
+                      <td className="r muted">{r.dur}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {D.highToken.length > 0 && (
+          <Card title="high-token no-tool inputs" span={D.recent.length > 0 ? 5 : 12}>
+            <div className="t-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr><th>date</th><th>model</th><th className="r">tokens</th><th className="r">time</th></tr>
+                </thead>
+                <tbody>
+                  {D.highToken.map((h, i) => (
+                    <tr key={i}>
+                      <td className="muted">{h.date}</td>
+                      <td>{h.model}</td>
+                      <td className="r warn">{fmtNum(h.tokens)}</td>
+                      <td className="r muted">{h.time}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </main>
+
+      {/* ALL-TIME FOOTER */}
+      <footer className="footer">
+        <div className="footer-l">
+          <div className="eyebrow">all-time</div>
+          <div className="footer-stats">
+            <div className="fs"><span className="v">{D.overall.sessions}</span><span className="l">sessions</span></div>
+            <div className="fs"><span className="v">{D.overall.inputs}</span><span className="l">inputs</span></div>
+            <div className="fs"><span className="v">{D.overall.turns}</span><span className="l">turns</span></div>
+            <div className="fs"><span className="v">{fmtNum(D.overall.tokens)}</span><span className="l">tokens</span></div>
+            <div className="fs"><span className="v cost">{fmt$(D.overall.cost)}</span><span className="l">cost</span></div>
+          </div>
+        </div>
+        <div className="footer-r">
+          <Brand small />
+          <span className="dot">·</span>
+          <span className="muted">{D.generatedAt}</span>
+        </div>
+      </footer>
+
+      <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} period={period} data={data} theme={theme} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
 </body>
 </html>`;

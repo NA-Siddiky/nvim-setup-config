@@ -467,6 +467,14 @@ const captureCache = new Map<string, Promise<Map<string, ToolRegistration>>>();
 let jitiLoader: JitiLoader | undefined;
 let aliasRegistration: Promise<void> | undefined;
 
+/**
+ * Monotonically-increasing counter bumped on every session_start.
+ * In-flight alias registrations capture this value; if the session
+ * has been replaced by the time they try to mutate state or call pi
+ * APIs, they bail out instead of operating on a stale context.
+ */
+let sessionGeneration = 0;
+
 function getJitiLoader(): JitiLoader {
   if (!jitiLoader) {
     jitiLoader = createJiti(import.meta.url, {
@@ -619,6 +627,10 @@ async function captureCompanionTools(
 async function doRegisterAliasesForLoadedCompanions(
   pi: ExtensionAPI,
 ): Promise<void> {
+  // Snapshot the generation at the start of this async operation so we can
+  // detect mid-flight session replacements and bail before touching stale state.
+  const capturedGeneration = sessionGeneration;
+
   const allTools = pi.getAllTools();
   const toolIndex = new Map<string, ToolInfo>();
   const knownNames = new Set<string>();
@@ -649,6 +661,9 @@ async function doRegisterAliasesForLoadedCompanions(
       const captured = await captureCompanionTools(loadTarget, pi);
       const def = captured.get(flatName);
       if (!def) continue;
+
+      // Bail if the session was replaced while we awaited async work above.
+      if (capturedGeneration !== sessionGeneration) return;
 
       pi.registerTool({
         ...def,
@@ -757,6 +772,27 @@ function isAnthropicOAuthModel(ctx: ExtensionContext): boolean {
 
 export default async function piClaudeCodeUse(pi: ExtensionAPI): Promise<void> {
   pi.on("session_start", async () => {
+    // Bump the generation counter *first* so any in-flight doRegister…
+    // call from the previous session detects the change and stops before
+    // it touches the now-replaced pi or mutates freshly-cleared state.
+    sessionGeneration++;
+
+    // Clear stale module-level caches so each session gets fresh alias
+    // registration. Without this, registeredMcpAliases retains entries from
+    // the previous runtime, causing aliases to be skipped in new sessions.
+    registeredMcpAliases.clear();
+    autoActivatedAliases.clear();
+    captureCache.clear();
+    jitiLoader = undefined;
+    lastManagedToolList = undefined;
+
+    // Drop any pending alias-registration promise before starting a fresh one.
+    // Without this reset, registerAliasesForLoadedCompanions(pi) would return
+    // the old promise (via ??=), which holds a reference to the stale pi and
+    // would throw "ctx is stale" when it eventually resolves and calls
+    // pi.registerTool() on the replaced session's ExtensionAPI.
+    aliasRegistration = undefined;
+
     await registerAliasesForLoadedCompanions(pi);
   });
 
