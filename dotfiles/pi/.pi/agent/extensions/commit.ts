@@ -16,58 +16,78 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const FAST_MODEL_PROVIDER = "anthropic";
-const FAST_MODEL_ID = "claude-haiku-4-5";
+const FAST_MODEL_PROVIDER = "google";
+const FAST_MODEL_ID = "gemini-3.1-flash-lite-preview";
 
 export default function (pi: ExtensionAPI) {
-	let commitInProgress = false;
-	let previousModel: Model | undefined;
+  let commitInProgress = false;
+  let previousModel: Model | undefined;
 
-	// When the agent finishes, restore the previous model (if we switched for a commit)
-	pi.on("agent_end", async (_event, ctx) => {
-		if (!commitInProgress) return;
-		commitInProgress = false;
+  // When the agent finishes, restore the previous model (if we switched for a commit)
+  pi.on("agent_end", async (_event, ctx) => {
+    if (!commitInProgress) return;
+    commitInProgress = false;
 
-		if (previousModel) {
-			const restored = previousModel;
-			previousModel = undefined;
-			const success = await pi.setModel(restored);
-			if (success) {
-				ctx.ui.notify(`↩ Restored model: ${restored.id}`, "info");
-			}
-		}
-	});
+    if (previousModel) {
+      const restored = previousModel;
+      previousModel = undefined;
+      const success = await pi.setModel(restored);
+      if (success) {
+        ctx.ui.notify(`↩ Restored model: ${restored.id}`, "info");
+      }
+    }
+  });
 
-	pi.registerCommand("commit", {
-		description: `Generate commit message using ${FAST_MODEL_ID}, then restore model`,
-		handler: async (_args, ctx) => {
-			// Wait for any ongoing agent turn to finish first
-			await ctx.waitForIdle();
+  pi.registerCommand("commit", {
+    description: `Generate commit message using ${FAST_MODEL_ID}, then restore model`,
+    handler: async (_args, ctx) => {
+      // Wait for any ongoing agent turn to finish first
+      await ctx.waitForIdle();
 
-			const fastModel = ctx.modelRegistry.find(FAST_MODEL_PROVIDER, FAST_MODEL_ID);
-			if (!fastModel) {
-				ctx.ui.notify(
-					`Model not found: ${FAST_MODEL_PROVIDER}/${FAST_MODEL_ID}. Check FAST_MODEL_ID in the extension.`,
-					"error",
-				);
-				return;
-			}
+      const fastModel = ctx.modelRegistry.find(
+        FAST_MODEL_PROVIDER,
+        FAST_MODEL_ID,
+      );
+      if (!fastModel) {
+        ctx.ui.notify(
+          `Model not found: ${FAST_MODEL_PROVIDER}/${FAST_MODEL_ID}. Check FAST_MODEL_ID in the extension.`,
+          "error",
+        );
+        return;
+      }
 
-			// Save current model so we can restore it after the commit
-			previousModel = ctx.model;
+      // Save current model so we can restore it after the commit
+      previousModel = ctx.model;
 
-			const switched = await pi.setModel(fastModel);
-			if (!switched) {
-				ctx.ui.notify(`No API key available for ${FAST_MODEL_ID}`, "error");
-				previousModel = undefined;
-				return;
-			}
+      const switched = await pi.setModel(fastModel);
+      if (!switched) {
+        ctx.ui.notify(`No API key available for ${FAST_MODEL_ID}`, "error");
+        previousModel = undefined;
+        return;
+      }
 
-			ctx.ui.notify(`⚡ Switched to ${FAST_MODEL_ID} for commit`, "info");
-			commitInProgress = true;
+      ctx.ui.notify(`⚡ Switched to ${FAST_MODEL_ID} for commit`, "info");
+      commitInProgress = true;
 
-			// Trigger the caveman-commit skill (expands via normal skill pipeline)
-			pi.sendUserMessage("/skill:caveman-commit");
-		},
-	});
+      // Trigger the caveman-commit skill (expands via normal skill pipeline)
+      pi.sendUserMessage(`
+
+Role: Tech Lead.
+
+Task:
+
+1. Run \`git diff --cached\` to get the staged changes.
+2. If result is empty, ask the user to stage changes and stop there.
+3. If not, only then analyze the staged diff via \`git diff --cached\`
+4. Generate a conventional commit message following the specification:
+   - Format: \`type(scope): subject\`
+   - Types allowed: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+   - Subject: Imperative mood, lowercase, no period, max 50 characters
+   - Body (if needed): Wrap at 72 characters, explain _why_ not _how_. Keep it short. Preferably one liner
+   - Footer: Flag breaking changes with \`BREAKING CHANGE:\`
+5. If you see multiple completely different scopes, use your best judgement to decide which one to commit.
+6. Commit the changes with the generated message and body
+        `);
+    },
+  });
 }
