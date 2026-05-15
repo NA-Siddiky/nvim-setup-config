@@ -264,6 +264,7 @@ ZSH_HIGHLIGHT_STYLES[path]='fg=white,underline'
 # ── aliases ──────────────────────────────────────────────────────────────
 alias v="NVIM_APPNAME=nvim.12 nvim"
 alias vm="nvim"
+alias lg="lazygit"
 alias zc="nvim ~/.zshrc"
 alias zs="source ~/.zshrc"
 alias ls="eza"
