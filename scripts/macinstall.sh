@@ -1,195 +1,425 @@
 #!/bin/bash
 
-DOTFILES_DIR="dotfiles"
+# ── Config ────────────────────────────────────────────────────────────────
+PERSONAL_GH_USER="Nur-E-Alom Siddiky"
+PERSONAL_EMAIL="siddiky.academic@gmail.com"
+WORK_GH_USER="na-siddiky-qp"
+WORK_EMAIL="nur-e-alom.siddiky@questionpro.com"
+# Git identities auto-switch by directory:
+#   ~/Development/Personal/ → personal account (includes OCI/)
+#   ~/Development/Office/   → work account
 
-# Function to log actions to a file
+OCI_IP="140.245.9.229"
+OCI_KEY="$HOME/.ssh/oci_aarch64"   # path to your OCI instance private key
+# ──────────────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+DOTFILES_DIR="$REPO_DIR/dotfiles"
+
+RED='\033[31m'; GREEN='\033[32m'; BLUE='\033[34m'; YELLOW='\033[33m'; NC='\033[0m'
+
 log_action() {
-  local message="$1"
-  local log_file="$HOME/setup.log"
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >>"$log_file" 2>/dev/null || {
-    echo -e "\033[31mError: Failed to write to log file '$log_file'.\033[0m"
-  }
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$HOME/setup.log" 2>/dev/null
 }
 
-# Function to send desktop notifications
 notify() {
-  local message="$1"
-  local expire_time="${2:-10000}" # Default to 10 seconds
-  if command -v notify-send >/dev/null 2>&1; then
-    notify-send "$message" --expire-time="$expire_time" || {
-      echo -e "\033[31mError: Failed to send notification.\033[0m"
-    }
-  else
-    echo -e "\033[33mWarning: notify-send not installed, skipping notification.\033[0m"
-  fi
-  log_action "$message"
+  osascript -e "display notification \"$1\" with title \"Mac Setup\"" 2>/dev/null || true
+  log_action "$1"
+  echo -e "${GREEN}✓ $1${NC}"
 }
 
-# Function to install Homebrew
 set_homebrew() {
-  echo -e "\033[34mInstalling Homebrew...\033[0m"
+  echo -e "${BLUE}Setting up Homebrew...${NC}"
   if ! command -v brew >/dev/null 2>&1; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || {
-      echo -e "\033[31mError: Homebrew installation failed.\033[0m"
+      echo -e "${RED}Error: Homebrew installation failed.${NC}"
       log_action "Homebrew installation failed"
       return 1
     }
-    echo >>/Users/mahi/.zprofile
-    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >>/Users/mahi/.zprofile
+    echo >> "$HOME/.zprofile"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
     eval "$(/opt/homebrew/bin/brew shellenv)"
-    notify "Homebrew installed successfully"
+    notify "Homebrew installed"
   else
-    echo -e "\033[32mHomebrew already installed.\033[0m"
-    notify "Homebrew already installed"
+    echo -e "${GREEN}Homebrew already installed.${NC}"
   fi
 }
 
-# Function to install applications via Homebrew
 set_apps() {
-  echo -e "\033[34mInstalling applications via Homebrew...\033[0m"
+  echo -e "${BLUE}Installing apps...${NC}"
   if ! command -v brew >/dev/null 2>&1; then
-    echo -e "\033[31mError: Homebrew not installed. Run set_homebrew first.\033[0m"
-    log_action "Homebrew not installed for set_apps"
+    echo -e "${RED}Error: run set_homebrew first.${NC}"
     return 1
   fi
 
-  local apps=(
-    zsh stow neovim git fastfetch tree-sitter ripgrep caffeine zen
-    tailscale vlc qbittorrent alt-tab lazygit shottr mos starship
-    slack whatsapp fzf tmux fnm raycast rectangle ghostty thefuck eza
+  # CLI tools
+  local cli_tools=(
+    zsh stow neovim git fastfetch tree-sitter ripgrep lazygit starship
+    fzf tmux fnm eza gh jq bat fd git-delta pnpm mosh
   )
 
-  for app in "${apps[@]}"; do
-    echo -e "\033[34mInstalling $app...\033[0m"
-    brew install "$app" || {
-      echo -e "\033[31mWarning: Failed to install $app.\033[0m"
-      log_action "Failed to install $app"
-    }
+  # GUI apps (casks)
+  local casks=(
+    ghostty raycast alt-tab shottr mos
+  )
+
+  for tool in "${cli_tools[@]}"; do
+    echo -e "${BLUE}  brew install $tool${NC}"
+    brew install "$tool" 2>/dev/null || { echo -e "${YELLOW}  Warning: $tool failed${NC}"; log_action "Failed: $tool"; }
   done
-  notify "Application installation complete"
+
+  for cask in "${casks[@]}"; do
+    echo -e "${BLUE}  brew install --cask $cask${NC}"
+    brew install --cask "$cask" 2>/dev/null || { echo -e "${YELLOW}  Warning: $cask failed${NC}"; log_action "Failed cask: $cask"; }
+  done
+
+  brew cleanup
+  notify "App installation complete"
 }
 
-# Function to set up dotfiles and Zsh configuration
-set_dotfiles() {
-  echo -e "\033[34mSetting up dotfiles and Zsh...\033[0m"
+set_node() {
+  echo -e "${BLUE}Setting up Node LTS via fnm...${NC}"
+  if ! command -v fnm >/dev/null 2>&1; then
+    echo -e "${RED}fnm not found, run set_apps first${NC}"
+    return 1
+  fi
+  eval "$(fnm env)"
+  fnm install --lts && fnm use lts-latest && fnm default lts-latest || {
+    echo -e "${YELLOW}Warning: failed to install Node LTS${NC}"
+    return 1
+  }
+  echo -e "${GREEN}Node $(node --version) ready${NC}"
 
-  # Install oh-my-zsh
+  # Install bun separately (fastest JS runtime/bundler)
+  if ! command -v bun >/dev/null 2>&1; then
+    curl -fsSL https://bun.sh/install | bash || echo -e "${YELLOW}Warning: bun install failed${NC}"
+  fi
+
+  notify "Node + bun installed"
+}
+
+set_gitconfig() {
+  echo -e "${BLUE}Writing git config files...${NC}"
+
+  cat > "$HOME/.gitconfig" << EOF
+[user]
+  name = Nur-e-alom Siddiky
+[credential]
+  helper = osxkeychain
+[core]
+  ignorecase = false
+  excludesfile = ~/.gitignore_global
+[includeIf "gitdir/i:~/Development/Office/"]
+  path = ~/.gitconfig-qp
+[includeIf "gitdir/i:~/Development/Personal/"]
+  path = ~/.gitconfig-personal
+[pager]
+  diff = delta
+  log = delta
+  reflog = delta
+  show = delta
+[interactive]
+  diffFilter = delta --color-only
+[delta]
+  navigate = true
+  light = false
+  side-by-side = true
+[pull]
+  rebase = false
+[init]
+  defaultBranch = main
+EOF
+
+  cat > "$HOME/.gitignore_global" << 'EOF'
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# editors
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+EOF
+  git config --global core.excludesfile "$HOME/.gitignore_global"
+
+  cat > "$HOME/.gitconfig-qp" << EOF
+[user]
+  name = ${WORK_GH_USER}
+  email = ${WORK_EMAIL}
+EOF
+
+  cat > "$HOME/.gitconfig-personal" << EOF
+[user]
+  name = ${PERSONAL_GH_USER}
+  email = ${PERSONAL_EMAIL}
+EOF
+
+  notify "Git config written"
+}
+
+set_dotfiles() {
+  echo -e "${BLUE}Setting up Zsh + oh-my-zsh...${NC}"
+
   if [[ ! -d ~/.oh-my-zsh ]]; then
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended || {
-      echo -e "\033[31mError: Failed to install oh-my-zsh.\033[0m"
+      echo -e "${RED}Error: oh-my-zsh install failed.${NC}"
       log_action "oh-my-zsh installation failed"
       return 1
     }
   else
-    echo -e "\033[32moh-my-zsh already installed.\033[0m"
+    echo -e "${GREEN}oh-my-zsh already installed.${NC}"
   fi
 
-  # Set zsh as default shell
-  if [[ "$(dscl . -read /Users/$USER UserShell | awk '{print $2}')" != "$(which zsh)" ]]; then
-    chsh -s "$(which zsh)" "$USER" || {
-      echo -e "\033[31mError: Failed to set zsh as default shell.\033[0m"
-      log_action "Failed to set zsh as default shell"
+  local brew_zsh="/opt/homebrew/bin/zsh"
+  if ! grep -qF "$brew_zsh" /etc/shells; then
+    echo "$brew_zsh" | sudo tee -a /etc/shells
+  fi
+  local current_shell
+  current_shell=$(dscl . -read "/Users/$USER" UserShell | awk '{print $2}')
+  if [[ "$current_shell" != "$brew_zsh" ]]; then
+    chsh -s "$brew_zsh" "$USER" || {
+      echo -e "${RED}Error: could not set zsh as default shell.${NC}"
       return 1
     }
-  else
-    echo -e "\033[32mzsh already set as default shell.\033[0m"
   fi
 
-  # Install zsh plugins
-  local zsh_custom=${ZSH_CUSTOM:-~/.oh-my-zsh/custom}
+  local zsh_custom=${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}
   local plugins=(
     "zsh-users/zsh-autosuggestions"
     "zsh-users/zsh-syntax-highlighting"
   )
-
   for plugin in "${plugins[@]}"; do
     local dest="$zsh_custom/plugins/${plugin##*/}"
     if [[ ! -d "$dest" ]]; then
       git clone "https://github.com/$plugin" "$dest" || {
-        echo -e "\033[31mWarning: Failed to clone $plugin.\033[0m"
-        log_action "Failed to clone $plugin"
+        echo -e "${YELLOW}Warning: failed to clone $plugin${NC}"
       }
-    else
-      echo -e "\033[32mPlugin ${plugin##*/} already installed.\033[0m"
     fi
   done
 
-  # Setup dotfiles
-
+  write_zshrc
   notify "Terminal setup complete"
 }
 
-# Function to set up SSH configuration
+set_stow() {
+  echo -e "${BLUE}Stowing dotfiles...${NC}"
+  local pkg stow_err
+  for pkg_dir in "$DOTFILES_DIR"/*/; do
+    [[ -d "$pkg_dir" ]] || continue
+    pkg=$(basename "$pkg_dir")
+
+    if stow --restow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" 2>/dev/null; then
+      echo -e "${GREEN}  ✓ $pkg${NC}"
+    else
+      stow_err=$(stow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" 2>&1)
+      echo "$stow_err" | grep "cannot stow" | sed 's/.*over existing target //;s/ since.*//' | \
+        while read -r target; do
+          [[ -n "$target" && -f "$HOME/$target" && ! -L "$HOME/$target" ]] && \
+            mv "$HOME/$target" "$HOME/$target.bak.$(date +%s)"
+        done
+      stow --restow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" && \
+        echo -e "${GREEN}  ✓ $pkg (conflict resolved)${NC}" || \
+        echo -e "${YELLOW}  Warning: could not stow $pkg${NC}"
+    fi
+  done
+  notify "Dotfiles stowed"
+}
+
+write_zshrc() {
+  mkdir -p "$DOTFILES_DIR/zsh"
+  echo -e "${BLUE}Writing dotfiles/zsh/.zshrc...${NC}"
+
+  cat > "$DOTFILES_DIR/zsh/.zshrc" << ZSHRC
+fastfetch
+export ZSH="\$HOME/.oh-my-zsh"
+export TERM="xterm-256color"
+
+# ── zsh-autosuggestions config (must be before omz source) ───────────────
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=244"
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+
+DISABLE_UNTRACKED_FILES_DIRTY="true"
+plugins=(git z zsh-autosuggestions zsh-syntax-highlighting)
+source "\$ZSH/oh-my-zsh.sh"
+
+# ── zsh-syntax-highlighting colors ───────────────────────────────────────
+typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[command]='fg=blue,bold'
+ZSH_HIGHLIGHT_STYLES[builtin]='fg=cyan,bold'
+ZSH_HIGHLIGHT_STYLES[alias]='fg=green,bold'
+ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=red'
+ZSH_HIGHLIGHT_STYLES[path]='fg=white,underline'
+
+# ── aliases ──────────────────────────────────────────────────────────────
+alias v="NVIM_APPNAME=nvim.12 nvim"
+alias vm="nvim"
+alias zc="nvim ~/.zshrc"
+alias zs="source ~/.zshrc"
+alias ls="eza"
+alias ll="eza -la --git"
+alias lt="eza --tree --level=2"
+alias cat="bat --style=plain"
+
+# git identity auto-switches by directory:
+#   ~/Development/Personal/ → siddiky.academic@gmail.com
+#   ~/Development/Office/   → nur-e-alom.siddiky@questionpro.com
+
+# OCI remote dev
+alias oci="mosh ubuntu@${OCI_IP} --ssh='ssh -i ${OCI_KEY}'"
+alias oci-ssh="ssh oci"
+
+# Node / JS
+alias nr="npm run"
+alias nd="npm run dev"
+alias pi="pnpm install"
+alias pd="pnpm dev"
+alias pb="pnpm build"
+alias px="pnpm exec"
+
+# ── tools ────────────────────────────────────────────────────────────────
+eval "\$(starship init zsh)"
+source <(fzf --zsh)
+eval "\$(fnm env --use-on-cd --shell zsh)"
+
+# ── pnpm ─────────────────────────────────────────────────────────────────
+export PNPM_HOME="\$HOME/Library/pnpm"
+case ":\$PATH:" in
+  *":\$PNPM_HOME:"*) ;;
+  *) export PATH="\$PNPM_HOME:\$PATH" ;;
+esac
+
+# ── bun ──────────────────────────────────────────────────────────────────
+export BUN_INSTALL="\$HOME/.bun"
+export PATH="\$BUN_INSTALL/bin:\$PATH"
+[[ -s "\$HOME/.bun/_bun" ]] && source "\$HOME/.bun/_bun"
+
+# ── optional tools (guarded) ─────────────────────────────────────────────
+[[ -f "\$HOME/.cargo/env" ]] && source "\$HOME/.cargo/env"
+export PATH="\$HOME/.local/bin:\$PATH"
+
+# ── history ──────────────────────────────────────────────────────────────
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt appendhistory sharehistory incappendhistory extendedhistory
+setopt histignorealldups histignorespace histignoredups histreduceblanks
+ZSHRC
+
+  echo -e "${GREEN}dotfiles/zsh/.zshrc written${NC}"
+}
+
 set_ssh() {
-  echo -e "\033[34mSetting up SSH configuration...\033[0m"
-  mkdir -p ~/.ssh || {
-    echo -e "\033[31mError: Failed to create ~/.ssh directory.\033[0m"
-    log_action "Failed to create ~/.ssh directory"
-    return 1
-  }
-  chmod 700 ~/.ssh
+  echo -e "${BLUE}Setting up SSH keys...${NC}"
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
 
   local ssh_keys=(
-    "qp_ed25519:sifat@macbook"
-    "id_ed25519:mahi@mackbook"
+    "id_ed25519_personal:${PERSONAL_GH_USER}@macbook"
+    "id_ed25519_qp:${WORK_GH_USER}@macbook"
   )
 
   for key in "${ssh_keys[@]}"; do
-    IFS=':' read -r filename comment <<<"$key"
-    if [[ ! -f ~/.ssh/$filename ]]; then
-      ssh-keygen -t ed25519 -C "$comment" -f ~/.ssh/"$filename" -N "" || {
-        echo -e "\033[31mWarning: Failed to generate SSH key $filename.\033[0m"
-        log_action "Failed to generate SSH key $filename"
+    IFS=':' read -r filename comment <<< "$key"
+    if [[ ! -f "$HOME/.ssh/$filename" ]]; then
+      ssh-keygen -t ed25519 -C "$comment" -f "$HOME/.ssh/$filename" -N "" || {
+        echo -e "${YELLOW}Warning: failed to generate $filename${NC}"
+        log_action "Failed SSH key: $filename"
       }
+      echo -e "${GREEN}Add this key to GitHub → Settings → SSH keys:${NC}"
+      cat "$HOME/.ssh/$filename.pub"
+      ssh-add --apple-use-keychain "$HOME/.ssh/$filename" 2>/dev/null || ssh-add "$HOME/.ssh/$filename"
     else
-      echo -e "\033[32mSSH key $filename already exists.\033[0m"
+      echo -e "${GREEN}SSH key $filename already exists.${NC}"
+      ssh-add --apple-use-keychain "$HOME/.ssh/$filename" 2>/dev/null || true
     fi
   done
 
-  cat >~/.ssh/config <<EOF
-Host github.com
+  cat > "$HOME/.ssh/config" << EOF
+# --- WORK ACCOUNT (QP) ---
+Host github.com-qp
     HostName github.com
     User git
-    IdentityFile ~/.ssh/id_ed25519
+    IdentityFile ~/.ssh/id_ed25519_qp
+    AddKeysToAgent yes
+    UseKeychain yes
 
-Host qp.github.com
+# --- PERSONAL ACCOUNT ---
+Host github.com-personal
     HostName github.com
     User git
-    IdentityFile ~/.ssh/qp_ed25519
+    IdentityFile ~/.ssh/id_ed25519_personal
+    AddKeysToAgent yes
+    UseKeychain yes
+
+# --- OCI Remote Dev (Personal) ---
+Host oci
+    HostName ${OCI_IP}
+    User ubuntu
+    IdentityFile ${OCI_KEY}
+    AddKeysToAgent yes
+    UseKeychain yes
+    ServerAliveInterval 60
 EOF
 
-  chmod 600 ~/.ssh/config || {
-    echo -e "\033[31mError: Failed to set permissions on ~/.ssh/config.\033[0m"
-    log_action "Failed to set permissions on ~/.ssh/config"
-    return 1
-  }
-
+  chmod 600 "$HOME/.ssh/config"
   notify "SSH setup complete"
 }
 
-# Setup mac defaults
+set_dev_dirs() {
+  echo -e "${BLUE}Creating development directory structure...${NC}"
+  mkdir -p "$HOME/Development/Personal/OCI"
+  mkdir -p "$HOME/Development/Office"
+  echo -e "${GREEN}Created ~/Development/Personal/ and ~/Development/Office/${NC}"
+}
+
 set_mac_defaults() {
-  # dock settings
-  defaults write com.apple.dock "autohide" -bool "true"
+  echo -e "${BLUE}Applying macOS defaults...${NC}"
+
+  # Dock — instant autohide, no recents, only open apps
+  defaults write com.apple.dock autohide -bool true
   defaults write com.apple.dock autohide-time-modifier -int 0
-  defaults write com.apple.dock "show-recents" -bool "false"
-  defaults write com.apple.dock "static-only" -bool "true"
-  defaults write com.apple.dock "autohide-delay" -float "0"
+  defaults write com.apple.dock autohide-delay -float 0
+  defaults write com.apple.dock show-recents -bool false
+  defaults write com.apple.dock static-only -bool true
+  defaults write com.apple.dock expose-group-apps -bool true
   defaults write NSGlobalDomain _HIHideMenuBar -bool true
-  defaults write com.apple.dock "expose-group-apps" -bool "true"
   killall Dock
 
-  # finder settings
-  defaults write com.apple.finder "FXPreferredViewStyle" -string "Nlsv"
-  defaults write NSGlobalDomain "AppleShowAllExtensions" -bool "true"
-  defaults write com.apple.finder "ShowPathbar" -bool "true"
+  # Finder — list view, show extensions, show path bar
+  defaults write com.apple.finder FXPreferredViewStyle -string "Nlsv"
+  defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+  defaults write com.apple.finder ShowPathbar -bool true
   killall Finder
 
-  # misc
+  # Keyboard — fast key repeat (essential for Neovim)
   defaults write -g ApplePressAndHoldEnabled -bool false
-  defaults write -g InitialKeyRepeat -int 20
+  defaults write -g InitialKeyRepeat -int 15
   defaults write -g KeyRepeat -int 1
-  defaults write NSGlobalDomain AppleKeyboardUIMode -int "2"
-  defaults write com.apple.spaces "spans-displays" -bool "false" && killall SystemUIServer
+  defaults write NSGlobalDomain AppleKeyboardUIMode -int 2
+
+  # Spaces — don't span displays
+  defaults write com.apple.spaces spans-displays -bool false && killall SystemUIServer
+
+  notify "macOS defaults applied"
 }
+
+# ── Run all ────────────────────────────────────────────────────────────────
+set_homebrew
 set_apps
+set_node
+set_dev_dirs
+set_gitconfig
+set_dotfiles
+set_stow
+set_ssh
+set_mac_defaults
