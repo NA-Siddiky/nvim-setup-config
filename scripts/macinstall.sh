@@ -10,7 +10,7 @@ WORK_EMAIL="nur-e-alom.siddiky@questionpro.com"
 #   ~/Development/Office/   → work account
 
 OCI_IP="140.245.9.229"
-OCI_KEY="$HOME/.ssh/oci_aarch64"   # path to your OCI instance private key
+OCI_KEY="$HOME/Development/Personal/OCI/ssh-key-2025-08-11.key"
 # ──────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -61,7 +61,7 @@ set_apps() {
 
   # GUI apps (casks)
   local casks=(
-    ghostty raycast alt-tab shottr mos
+    ghostty raycast alt-tab shottr mos visual-studio-code
   )
 
   for tool in "${cli_tools[@]}"; do
@@ -276,8 +276,11 @@ alias cat="bat --style=plain"
 #   ~/Development/Office/   → nur-e-alom.siddiky@questionpro.com
 
 # OCI remote dev
-alias oci="mosh ubuntu@${OCI_IP} --ssh='ssh -i ${OCI_KEY}'"
+alias oci="mosh --ssh='ssh -i ~/Development/Personal/OCI/ssh-key-2025-08-11.key' ubuntu@${OCI_IP}"
 alias oci-ssh="ssh oci"
+
+# VS Code CLI
+export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:\$PATH"
 
 # Node / JS
 alias nr="npm run"
@@ -365,7 +368,7 @@ Host github.com-personal
 Host oci
     HostName ${OCI_IP}
     User ubuntu
-    IdentityFile ${OCI_KEY}
+    IdentityFile ~/Development/Personal/OCI/ssh-key-2025-08-11.key
     AddKeysToAgent yes
     UseKeychain yes
     ServerAliveInterval 60

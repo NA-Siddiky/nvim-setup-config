@@ -30,8 +30,11 @@ alias lt="eza --tree --level=2"
 alias cat="bat --style=plain"
 
 # OCI remote dev
-alias oci="mosh ubuntu@140.245.9.229 --ssh='ssh -i ~/.ssh/oci_aarch64'"
+alias oci="mosh --ssh='ssh -i ~/Development/Personal/OCI/ssh-key-2025-08-11.key' ubuntu@140.245.9.229"
 alias oci-ssh="ssh oci"
+
+# VS Code CLI
+export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:$PATH"
 
 # Node / JS
 alias nr="npm run"

@@ -9,7 +9,7 @@ $PERSONAL_EMAIL   = "siddiky.academic@gmail.com"
 $WORK_GH_USER     = "na-siddiky-qp"
 $WORK_EMAIL       = "nur-e-alom.siddiky@questionpro.com"
 $OCI_IP           = "140.245.9.229"
-$OCI_KEY          = "$env:USERPROFILE\.ssh\oci_aarch64"
+$OCI_KEY          = "$env:USERPROFILE\Development\Personal\OCI\ssh-key-2025-08-11.key"
 # ──────────────────────────────────────────────────────────────────────────
 
 $ErrorActionPreference = "Continue"

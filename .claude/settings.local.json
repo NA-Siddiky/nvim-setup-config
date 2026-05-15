@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls ~/Development/Personal/OCI/)",
+      "Read(//Users/sid/Development/Personal/OCI/**)",
+      "Bash(ls \"/Applications/Visual Studio Code.app\" 2>/dev/null && echo \"installed\" || echo \"not installed\")",
+      "Read(//Applications/Visual Studio Code.app/**)",
+      "Bash(cat ~/.ssh/config)",
+      "Read(//Users/sid/.ssh/**)",
+      "Bash(chmod 600 ~/Development/Personal/OCI/ssh-key-2025-08-11.key)"
+    ]
+  }
+}
