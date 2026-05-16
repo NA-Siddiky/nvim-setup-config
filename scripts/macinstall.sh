@@ -401,6 +401,14 @@ set_dev_dirs() {
   echo -e "${GREEN}Created ~/Development/Personal/ and ~/Development/Office/${NC}"
 }
 
+set_fonts() {
+  echo -e "${BLUE}Installing fonts...${NC}"
+  # Nerd Font required for terminal icons (starship prompt, nvim, etc.)
+  brew install --cask font-jetbrains-mono-nerd-font 2>/dev/null || \
+    echo -e "${YELLOW}  Warning: font-jetbrains-mono-nerd-font failed${NC}"
+  notify "Fonts installed"
+}
+
 set_mac_defaults() {
   echo -e "${BLUE}Applying macOS defaults...${NC}"
 
@@ -441,4 +449,5 @@ set_gitconfig
 set_dotfiles
 set_stow
 set_ssh
+set_fonts
 set_mac_defaults
