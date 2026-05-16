@@ -33,10 +33,8 @@ else
   tmux send-keys -t "$NAME":editor 'v .' C-m
   sleep 0.1
 
-  # Window 2: Left - tests, Right - two panes (top: pnpm dev, bottom: focused)
+  # Window 2: Left - terminal, Right - dev server (top) + focused pane (bottom)
   tmux new-window -t "$NAME" -n dev
-  tmux send-keys -t "$NAME":dev 'a' C-m
-  sleep 0.1
 
   # Split window into two columns (left 80%, right 20%)
   tmux split-window -h -l 20% -t "$NAME":dev

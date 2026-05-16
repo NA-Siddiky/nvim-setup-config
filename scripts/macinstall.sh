@@ -280,6 +280,7 @@ ZSH_HIGHLIGHT_STYLES[path]='fg=white,underline'
 alias v="NVIM_APPNAME=nvim.12 nvim"
 alias vm="nvim"
 alias lg="lazygit"
+alias dev="bash ~/Development/Personal/nvim-setup-config/scripts/dev.sh"
 alias zc="nvim ~/.zshrc"
 alias zs="source ~/.zshrc"
 alias ls="eza"
@@ -295,8 +296,9 @@ alias cat="bat --style=plain"
 alias oci="mosh --ssh='ssh -i ~/Development/Personal/OCI/ssh-key-2025-08-11.key' ubuntu@${OCI_IP}"
 alias oci-ssh="ssh oci"
 
-# VS Code CLI
-export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:\$PATH"
+# VS Code CLI (macOS only)
+[[ -d "/Applications/Visual Studio Code.app" ]] && \
+  export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:\$PATH"
 
 # Node / JS
 alias nr="npm run"
@@ -440,14 +442,270 @@ set_mac_defaults() {
   notify "macOS defaults applied"
 }
 
-# ── Run all ────────────────────────────────────────────────────────────────
-set_homebrew
-set_apps
-set_node
-set_dev_dirs
-set_gitconfig
-set_dotfiles
-set_stow
-set_ssh
-set_fonts
-set_mac_defaults
+set_vscode_finder_action() {
+  echo -e "${BLUE}Setting up 'Open in VS Code' Finder Quick Action...${NC}"
+
+  local svc="$HOME/Library/Services/Open in VS Code.workflow"
+
+  if [[ -d "$svc" ]]; then
+    echo -e "${GREEN}'Open in VS Code' Quick Action already exists.${NC}"
+    return 0
+  fi
+
+  mkdir -p "$svc/Contents"
+
+  cat > "$svc/Contents/Info.plist" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>English</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.apple.automator.Open in VS Code</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Open in VS Code</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Open in VS Code</string>
+            </dict>
+            <key>NSSendFileTypes</key>
+            <array>
+                <string>public.item</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
+PLIST
+
+  cat > "$svc/Contents/document.wflow" << 'WFLOW'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>AMApplicationBuild</key>
+    <string>521.1</string>
+    <key>AMApplicationVersion</key>
+    <string>2.10</string>
+    <key>AMDocumentVersion</key>
+    <string>2</string>
+    <key>actions</key>
+    <array>
+        <dict>
+            <key>action</key>
+            <dict>
+                <key>AMAccepts</key>
+                <dict>
+                    <key>Container</key>
+                    <string>List</string>
+                    <key>Optional</key>
+                    <true/>
+                    <key>Types</key>
+                    <array>
+                        <string>com.apple.cocoa.path</string>
+                    </array>
+                </dict>
+                <key>AMActionVersion</key>
+                <string>2.0.3</string>
+                <key>AMApplication</key>
+                <array>
+                    <string>Automator</string>
+                </array>
+                <key>AMParameterProperties</key>
+                <dict>
+                    <key>COMMAND_STRING</key>
+                    <dict/>
+                    <key>CheckedForUserDefaultShell</key>
+                    <dict/>
+                    <key>inputMethod</key>
+                    <dict/>
+                    <key>shell</key>
+                    <dict/>
+                    <key>source</key>
+                    <dict/>
+                </dict>
+                <key>AMProvides</key>
+                <dict>
+                    <key>Container</key>
+                    <string>List</string>
+                    <key>Types</key>
+                    <array>
+                        <string>com.apple.cocoa.path</string>
+                    </array>
+                </dict>
+                <key>ActionBundlePath</key>
+                <string>/System/Library/Automator/Run Shell Script.action</string>
+                <key>ActionName</key>
+                <string>Run Shell Script</string>
+                <key>ActionParameters</key>
+                <dict>
+                    <key>COMMAND_STRING</key>
+                    <string>open -a "Visual Studio Code" "$@"</string>
+                    <key>CheckedForUserDefaultShell</key>
+                    <true/>
+                    <key>inputMethod</key>
+                    <integer>1</integer>
+                    <key>shell</key>
+                    <string>/bin/bash</string>
+                    <key>source</key>
+                    <string></string>
+                </dict>
+                <key>BundleIdentifier</key>
+                <string>com.apple.automator.runshellscript</string>
+                <key>CFBundleVersion</key>
+                <string>2.0.3</string>
+                <key>CanShowSelectedItemsWhenRun</key>
+                <false/>
+                <key>CanShowWhenRun</key>
+                <true/>
+                <key>Category</key>
+                <array>
+                    <string>AMCategoryUtilities</string>
+                </array>
+                <key>Class Name</key>
+                <string>RunShellScriptAction</string>
+                <key>InputUUID</key>
+                <string>1C2D8E3F-4A5B-6C7D-8E9F-0A1B2C3D4E5F</string>
+                <key>Keywords</key>
+                <array>
+                    <string>Shell</string>
+                    <string>Script</string>
+                    <string>Command</string>
+                    <string>Run</string>
+                    <string>Unix</string>
+                </array>
+                <key>OutputUUID</key>
+                <string>2D3E4F5A-6B7C-8D9E-0F1A-2B3C4D5E6F7A</string>
+                <key>UUID</key>
+                <string>3E4F5A6B-7C8D-9E0F-1A2B-3C4D5E6F7A8B</string>
+                <key>UnlockPassword</key>
+                <string></string>
+                <key>UserDefinedFields</key>
+                <dict/>
+                <key>isViewVisible</key>
+                <true/>
+                <key>localizedActionDescription</key>
+                <string>Run a shell script with the text passed to it as input.</string>
+                <key>localizedActionName</key>
+                <string>Run Shell Script</string>
+                <key>localizedBundleName</key>
+                <string>Run Shell Script</string>
+                <key>localizedDescription</key>
+                <string>Run a shell script with the text passed to it as input.</string>
+                <key>localizedName</key>
+                <string>Run Shell Script</string>
+                <key>localizedSummary</key>
+                <string>Run Shell Script with shell: /bin/bash</string>
+                <key>unlockDescription</key>
+                <string></string>
+            </dict>
+        </dict>
+    </array>
+    <key>connectors</key>
+    <dict/>
+    <key>workflowMetaData</key>
+    <dict>
+        <key>applicationBundleIDsByPath</key>
+        <dict/>
+        <key>applicationPaths</key>
+        <array/>
+        <key>inputTypeIdentifier</key>
+        <string>com.apple.Automator.fileSystemObject</string>
+        <key>outputTypeIdentifier</key>
+        <string>com.apple.Automator.nothing</string>
+        <key>presentationMode</key>
+        <integer>11</integer>
+        <key>processesInput</key>
+        <false/>
+        <key>serviceInputTypeIdentifier</key>
+        <string>com.apple.Automator.fileSystemObject</string>
+        <key>serviceOutputTypeIdentifier</key>
+        <string>com.apple.Automator.nothing</string>
+        <key>serviceProcessesInput</key>
+        <false/>
+        <key>ubiquitous</key>
+        <false/>
+        <key>workflowTypeIdentifier</key>
+        <string>com.apple.Automator.servicesMenu</string>
+    </dict>
+</dict>
+</plist>
+WFLOW
+
+  /System/Library/CoreServices/pbs -update 2>/dev/null || true
+  notify "'Open in VS Code' Quick Action installed"
+}
+
+# ── Step runner ───────────────────────────────────────────────────────────
+ALL_STEPS=(
+  set_homebrew
+  set_apps
+  set_node
+  set_dev_dirs
+  set_gitconfig
+  set_dotfiles
+  set_stow
+  set_ssh
+  set_fonts
+  set_mac_defaults
+  set_vscode_finder_action
+)
+
+FAILED_STEPS=()
+
+run_step() {
+  local fn="$1"
+  echo -e "\n${BLUE}━━━ $fn ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  if "$fn"; then
+    echo -e "${GREEN}✓ $fn done${NC}"
+  else
+    FAILED_STEPS+=("$fn")
+    echo -e "${RED}✗ $fn failed — skipping, continuing with next step${NC}"
+    log_action "FAILED: $fn"
+  fi
+}
+
+print_summary() {
+  echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  if [[ ${#FAILED_STEPS[@]} -eq 0 ]]; then
+    echo -e "${GREEN}Setup complete — all steps passed.${NC}"
+    notify "Mac setup finished successfully"
+  else
+    echo -e "${YELLOW}Setup finished with issues in the following steps:${NC}"
+    for fn in "${FAILED_STEPS[@]}"; do
+      echo -e "  ${RED}✗  $fn${NC}"
+    done
+    echo ""
+    echo -e "${YELLOW}Re-run a single step:   bash scripts/macinstall.sh <step_name>${NC}"
+    echo -e "${YELLOW}Run multiple steps:     bash scripts/macinstall.sh set_ssh set_stow${NC}"
+    echo -e "${YELLOW}Full log:               ~/setup.log${NC}"
+    notify "Mac setup finished with errors — check setup.log"
+  fi
+}
+
+# ── Run: all steps, or only the ones passed as arguments ──────────────────
+if [[ $# -gt 0 ]]; then
+  for step in "$@"; do
+    if declare -f "$step" > /dev/null 2>&1; then
+      run_step "$step"
+    else
+      echo -e "${RED}Unknown step: $step${NC}"
+      echo -e "${YELLOW}Available: ${ALL_STEPS[*]}${NC}"
+    fi
+  done
+else
+  for step in "${ALL_STEPS[@]}"; do
+    run_step "$step"
+  done
+fi
+
+print_summary

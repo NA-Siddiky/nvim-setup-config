@@ -23,6 +23,7 @@ ZSH_HIGHLIGHT_STYLES[path]='fg=white,underline'
 alias v="NVIM_APPNAME=nvim.12 nvim"
 alias vm="nvim"
 alias lg="lazygit"
+alias dev="bash ~/Development/Personal/nvim-setup-config/scripts/dev.sh"
 alias zc="nvim ~/.zshrc"
 alias zs="source ~/.zshrc"
 alias ls="eza"
@@ -34,8 +35,9 @@ alias cat="bat --style=plain"
 alias oci="mosh --ssh='ssh -i ~/Development/Personal/OCI/ssh-key-2025-08-11.key' ubuntu@140.245.9.229"
 alias oci-ssh="ssh oci"
 
-# VS Code CLI
-export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:$PATH"
+# VS Code CLI (macOS only)
+[[ -d "/Applications/Visual Studio Code.app" ]] && \
+  export PATH="/Applications/Visual Studio Code.app/Contents/Resources/app/bin:$PATH"
 
 # Node / JS
 alias nr="npm run"

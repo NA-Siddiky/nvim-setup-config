@@ -88,6 +88,16 @@ bash scripts/macinstall.sh
 
 Takes 10–20 min. All actions are logged to `~/setup.log`.
 
+Each step runs independently — if one fails, the rest continue. A summary at the end shows exactly what passed and what needs attention. The script is safe to re-run at any time, and you can target a single step without running everything:
+
+```bash
+# re-run one step
+bash scripts/macinstall.sh set_ssh
+
+# re-run multiple steps
+bash scripts/macinstall.sh set_ssh set_stow set_fonts
+```
+
 What it does, in order:
 
 | # | Function | What it does |
@@ -101,6 +111,7 @@ What it does, in order:
 | 7 | `set_stow` | Symlinks all dotfiles packages to `~` — see package table above |
 | 8 | `set_ssh` | Generates SSH keys, adds to Keychain, writes `~/.ssh/config` |
 | 9 | `set_mac_defaults` | Applies Dock, Finder, and keyboard preferences |
+| 10 | `set_vscode_finder_action` | Installs "Open in VS Code" right-click Quick Action in Finder |
 
 ### Step 5 — Restart the terminal
 
@@ -161,8 +172,9 @@ oci-ssh                 # → ubuntu@... Welcome to Ubuntu 24.04
 
 All green — setup is complete.
 
-> **Raycast folder search** is not set up by the script — do it once manually after install:
-> Raycast → `Cmd+,` → Extensions → File Search → enable **Folders**. This persists on the same machine.
+> **One-time manual steps after install:**
+> - **Raycast folder search** — Raycast → `Cmd+,` → Extensions → File Search → enable **Folders**
+> - **"Open in VS Code" Quick Action** — already installed by the script. If Finder doesn't show it yet, go to System Settings → Privacy & Security → Extensions → Finder Extensions and enable it, or log out and back in.
 
 ---
 
@@ -364,6 +376,7 @@ gh repo clone Nur-E-Alom/repo      -- ~/Development/Personal/repo
 | `v` | `NVIM_APPNAME=nvim.12 nvim` | Neovim with full config |
 | `vm` | `nvim` | Vanilla Neovim |
 | `lg` | `lazygit` | Terminal git UI |
+| `dev` | `bash .../scripts/dev.sh` | Launch 3-window tmux workspace |
 | `zc` | `nvim ~/.zshrc` | Edit shell config |
 | `zs` | `source ~/.zshrc` | Reload shell config |
 | `ls` | `eza` | Colorized file list |
@@ -378,6 +391,62 @@ gh repo clone Nur-E-Alom/repo      -- ~/Development/Personal/repo
 | `nd` | `npm run dev` | |
 | `oci` | `mosh ubuntu@140.245.9.229 ...` | Connect to OCI (persistent) |
 | `oci-ssh` | `ssh oci` | Connect to OCI (plain SSH) |
+
+---
+
+## Utility scripts
+
+Three helper scripts live in `scripts/`. None of these run automatically — call them when you need them.
+
+### dev.sh — launch a full dev workspace
+
+```bash
+# from: your project directory
+bash ~/Development/Personal/nvim-setup-config/scripts/dev.sh
+```
+
+Opens a tmux session named after the current directory with three pre-arranged windows:
+
+| Window | What's in it |
+|--------|-------------|
+| **editor** | Neovim (`v .`) with the project root open |
+| **dev** | Left pane (80%) free terminal · Right side: dev server on top, focused pane below |
+| **git** | lazygit |
+
+Dev server command is auto-detected from the lockfile (`bun dev` / `pnpm dev` / `npm run dev`). If the session already exists, running the script reattaches to it instead of creating a duplicate.
+
+### note.sh — quick journal entry
+
+```bash
+# syntax
+bash ~/Development/Personal/nvim-setup-config/scripts/note.sh <type> "<text #tags>"
+
+# examples
+bash ~/Development/Personal/nvim-setup-config/scripts/note.sh note "fix login redirect bug #backend"
+bash ~/Development/Personal/nvim-setup-config/scripts/note.sh learn "tmux split-window -h splits vertically"
+```
+
+Or use the tmux popup shortcuts (works anywhere inside a tmux session):
+
+| Key | What it does |
+|-----|-------------|
+| `M-n` | Opens a prompt → saves as a **note** entry |
+| `M-l` | Opens a prompt → saves as a **learn** entry |
+
+Entries are saved to `~/Documents/Notes/Mindflayer/QuickNotes/YYYY.md`, sorted under `## Month` → `### Day Weekday` headings.
+
+### pokemon-bg.sh — Ghostty background image
+
+```bash
+# random Pokemon
+bash ~/Development/Personal/nvim-setup-config/scripts/pokemon-bg.sh
+
+# specific Pokemon by Pokédex number
+bash ~/Development/Personal/nvim-setup-config/scripts/pokemon-bg.sh 25   # Pikachu
+bash ~/Development/Personal/nvim-setup-config/scripts/pokemon-bg.sh 59   # Arcanine
+```
+
+Downloads official artwork from PokeAPI, caches it in `~/Pictures/pokemon_bg/`, resizes to 1000×1000, and updates the `background-image` line in `dotfiles/ghostty/.config/ghostty/config`. Ghostty picks it up on next launch (or `Cmd+Shift+,` to reload in-place).
 
 ---
 

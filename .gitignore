@@ -1,5 +1,9 @@
 .DS_Store
 node_modules/
+OCI/*.key
+
+# tmux plugin manager (TPM) installs here via the stowed directory symlink
+dotfiles/tmux/.config/tmux/plugins/
 dotfiles/pi/.pi/*/sessions/*
 dotfiles/pi/.pi/*/auth*
 
