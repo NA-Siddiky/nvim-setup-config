@@ -7,15 +7,13 @@
 # Set your work directory here
 WORK_DIR=$(pwd)
 NAME=$(basename "$WORK_DIR")
-# Check if "wick" session exists
+# Reattach if a session for this directory already exists
 if tmux has-session -t "$NAME" 2>/dev/null; then
-  # If it exists, attach to it
   tmux attach-session -t "$NAME"
 else
-  # Change to work directory
   cd "$WORK_DIR" || exit 1
 
-  # Determine dev command based on lockfile; default to pnpm
+  # Detect package manager from lockfile; default to pnpm
   if [ -f bun.lock ]; then
     DEV_CMD="bun dev"
   elif [ -f pnpm-lock.yaml ]; then
@@ -26,7 +24,6 @@ else
     DEV_CMD="pnpm dev"
   fi
 
-  # Create new session named "wick" with first window
   tmux new-session -d -s "$NAME" -n editor
 
   # Window 1: nvim with current directory
