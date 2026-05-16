@@ -1,204 +1,263 @@
 # Dev Setup — Nur-e-alom Siddiky
 
-> One-script setup for React/Node development. Dual GitHub identities, OCI remote dev, Neovim. Runs on macOS, Ubuntu, and Windows.
+> One-script setup for React/Node development on Mac, Ubuntu (OCI), and Windows.
+> Dual GitHub identities, Neovim, Ghostty, tmux. Every config is version-controlled in this repo.
 
 ---
 
 ## Supported platforms
 
-| Platform | Script | Package manager |
-|----------|--------|----------------|
-| macOS (Apple Silicon M1/M2/M3) | `scripts/macinstall.sh` | Homebrew |
-| Ubuntu 24.04 aarch64 (OCI / local) | `scripts/ubuntuinstall.sh` | apt + curl |
-| Windows 11 | `scripts/wininstall.ps1` | winget + Scoop |
+| Platform | Script | Notes |
+|----------|--------|-------|
+| macOS Apple Silicon (M1/M2/M3) | `scripts/macinstall.sh` | Primary machine setup |
+| Ubuntu 24.04 aarch64 — OCI / local | `scripts/ubuntuinstall.sh` | OCI remote dev server |
+| Windows 11 | `scripts/wininstall.ps1` | Run in PowerShell 7 as Administrator |
 
 ---
 
-## Quick start — from zero on a new machine
+## Dotfiles packages
 
-### macOS
+Everything in `dotfiles/` is managed by GNU Stow. Each subfolder is a **package** — stow creates symlinks from it into `~`. This table is the single reference for all package operations.
 
-macOS ships with a system git that triggers Xcode CLI tools on first use. Nothing needs to be pre-installed.
+| Package | Symlinks to | Platform | Reload after change |
+|---------|------------|----------|-------------------|
+| `zsh` | `~/.zshrc` | All | `source ~/.zshrc` (alias: `zs`) in every open tab |
+| `nvim` | `~/.config/nvim/` and `~/.config/nvim.12/` | All | Close and reopen nvim |
+| `tmux` | `~/.config/tmux/tmux.conf` | All | `tmux source ~/.config/tmux/tmux.conf` |
+| `starship` | `~/.config/starship.toml` | All | `zs` or open a new terminal tab |
+| `fastfetch` | `~/.config/fastfetch/config.jsonc` | All | Run `fastfetch` — immediate |
+| `ghostty` | `~/.config/ghostty/config` | macOS only | `Cmd+Shift+,` inside Ghostty, or quit and reopen |
+| `pi` | `~/.pi/` | All | Restart the pi agent |
+| `stow` | `~/.stow-global-ignore` | All | No reload needed |
+
+**To apply any dotfile change** (run from repo root):
 
 ```bash
-# Step 1 — trigger Xcode CLI tools install if not done yet
-git --version
-
-# Step 2 — clone this repo via HTTPS (SSH isn't set up yet on a fresh machine)
-git clone https://github.com/<your-gh-username>/nvim-setup-config ~/Development/Personal/nvim-setup-config
 cd ~/Development/Personal/nvim-setup-config
 
-# Step 3 — copy your OCI private key to the expected location
-#           (skip if you don't use the OCI instance yet)
+# Pattern: stow --restow -d dotfiles -t ~ <package>
+stow --restow -d dotfiles -t ~ zsh
+stow --restow -d dotfiles -t ~ ghostty
+# ... same for any package in the table above
+```
+
+**To verify a symlink is wired up:**
+```bash
+# from: anywhere — use absolute paths
+ls -la ~/.config/ghostty/config
+# lrwxr-xr-x → .../dotfiles/ghostty/.config/ghostty/config  ← correct (symlink)
+# -rw-r--r--  ← plain file — stow not run yet for this package
+```
+
+---
+
+## Mac setup — step by step
+
+### Step 1 — Install Xcode Command Line Tools
+
+```bash
+xcode-select --install
+# A dialog appears — click Install. Takes 5–10 min.
+git --version   # confirm: git version 2.x
+```
+
+### Step 2 — Clone this repo
+
+SSH isn't set up yet, so use HTTPS:
+
+```bash
+mkdir -p ~/Development/Personal
+git clone https://github.com/Nur-E-Alom/nvim-setup-config.git ~/Development/Personal/nvim-setup-config
+cd ~/Development/Personal/nvim-setup-config
+```
+
+### Step 3 — Copy your OCI private key (skip if not using OCI)
+
+```bash
 mkdir -p ~/Development/Personal/OCI
 cp /path/to/ssh-key-2025-08-11.key ~/Development/Personal/OCI/ssh-key-2025-08-11.key
 chmod 600 ~/Development/Personal/OCI/ssh-key-2025-08-11.key
-
-# Step 4 — run the script (takes 10–20 min)
-bash scripts/macinstall.sh
-
-# Step 5 — restart terminal, then source config
-source ~/.zshrc
-
-# Step 6 — authenticate GitHub CLI (one-time, opens browser)
-gh auth login
 ```
 
-### Ubuntu 24.04 (OCI server or local)
+### Step 4 — Run the install script
 
 ```bash
-# Step 1 — clone (Ubuntu has git and curl by default)
-git clone https://github.com/<your-gh-username>/nvim-setup-config ~/nvim-setup-config
+# from: ~/Development/Personal/nvim-setup-config  (you are here after Step 2)
+bash scripts/macinstall.sh
+```
+
+Takes 10–20 min. All actions are logged to `~/setup.log`.
+
+What it does, in order:
+
+| # | Function | What it does |
+|---|----------|-------------|
+| 1 | `set_homebrew` | Installs Homebrew, writes PATH to `~/.zprofile` |
+| 2 | `set_apps` | Installs all CLI tools and GUI apps, runs `brew cleanup` |
+| 3 | `set_node` | Installs Node LTS via fnm, installs bun |
+| 4 | `set_dev_dirs` | Creates `~/Development/Personal/OCI/` and `~/Development/Office/` |
+| 5 | `set_gitconfig` | Writes `~/.gitconfig`, identity sub-configs, `~/.gitignore_global` |
+| 6 | `set_dotfiles` | Installs oh-my-zsh + plugins, writes `dotfiles/zsh/.zshrc` |
+| 7 | `set_stow` | Symlinks all dotfiles packages to `~` — see package table above |
+| 8 | `set_ssh` | Generates SSH keys, adds to Keychain, writes `~/.ssh/config` |
+| 9 | `set_mac_defaults` | Applies Dock, Finder, and keyboard preferences |
+
+### Step 5 — Restart the terminal
+
+Close the window completely and open a new one. This loads Homebrew zsh, oh-my-zsh, and all aliases.
+
+```bash
+# from: anywhere — these are sanity checks after the terminal restarts
+echo $SHELL          # → /opt/homebrew/bin/zsh
+node --version       # → v22.x
+```
+
+### Step 6 — Authenticate GitHub CLI
+
+```bash
+# from: anywhere
+gh auth login
+# Choose: GitHub.com → HTTPS → Login with a web browser
+```
+
+### Step 7 — Add SSH keys to GitHub
+
+The script generated two keys. Add their public keys to the matching GitHub account:
+
+```bash
+# from: anywhere
+cat ~/.ssh/id_ed25519_personal.pub   # → add to your personal github.com account
+cat ~/.ssh/id_ed25519_qp.pub         # → add to your QP github.com account
+# Both via: github.com → Settings → SSH and GPG keys → New SSH key
+
+# Test both connections
+ssh -T git@github.com-personal   # → Hi Nur-E-Alom!
+ssh -T git@github.com-qp         # → Hi na-siddiky-qp!
+```
+
+### Step 8 — Verify the full setup
+
+```bash
+# from: anywhere
+node --version          # → v22.x
+pnpm --version          # → 9.x
+bun --version           # → 1.x
+nvim --version          # → NVIM v0.10.x
+code --version          # → 1.9x.x
+gh auth status          # → Logged in to github.com as ...
+
+# Dotfiles — confirm symlinks (should show → not plain files)
+ls -la ~/.zshrc
+ls -la ~/.config/nvim
+ls -la ~/.config/ghostty/config
+
+# Git identities — -C flag sets the directory without cd
+git -C ~/Development/Personal config user.email   # → siddiky.academic@gmail.com
+git -C ~/Development/Office   config user.email   # → nur-e-alom.siddiky@questionpro.com
+
+# OCI (skip if key wasn't copied in Step 3)
+oci-ssh                 # → ubuntu@... Welcome to Ubuntu 24.04
+```
+
+All green — setup is complete.
+
+> **Raycast folder search** is not set up by the script — do it once manually after install:
+> Raycast → `Cmd+,` → Extensions → File Search → enable **Folders**. This persists on the same machine.
+
+---
+
+## Ubuntu setup (OCI server or local)
+
+```bash
+# from: ~ (home directory)
+git clone https://github.com/Nur-E-Alom/nvim-setup-config.git ~/nvim-setup-config
+
+# from: ~/nvim-setup-config
 cd ~/nvim-setup-config
+bash scripts/ubuntuinstall.sh   # takes 5–10 min
 
-# Step 2 — run
-bash scripts/ubuntuinstall.sh
-
-# Step 3 — switch to zsh (if not already the default)
+# from: anywhere — switch shell and authenticate
 exec zsh
-
-# Step 4 — stow all configs
-cd ~/nvim-setup-config
-stow -d dotfiles -t ~ zsh nvim tmux starship fastfetch
-
-# Step 5 — authenticate GitHub CLI
 gh auth login
 ```
 
-> On the OCI instance: this gives you the same terminal experience as your Mac — same aliases, same Neovim, same prompt.
+The Ubuntu script installs the same CLI tools via apt + direct downloads (no Homebrew). Dotfiles are written directly to `~` — stow is not used on the server.
 
-### Windows 11
+---
+
+## Windows setup
 
 ```powershell
 # Step 1 — open PowerShell 7 as Administrator
 
-# Step 2 — clone
-git clone https://github.com/<your-gh-username>/nvim-setup-config $env:USERPROFILE\Development\Personal\nvim-setup-config
-cd $env:USERPROFILE\Development\Personal\nvim-setup-config
+# from: anywhere — clone the repo
+git clone https://github.com/Nur-E-Alom/nvim-setup-config.git $env:USERPROFILE\Development\Personal\nvim-setup-config
 
-# Step 3 — run
+# from: repo root — run the script
+cd $env:USERPROFILE\Development\Personal\nvim-setup-config
 Set-ExecutionPolicy Bypass -Scope Process -Force
 powershell -ExecutionPolicy Bypass -File scripts\wininstall.ps1
 
 # Step 4 — restart Windows Terminal
 
-# Step 5 — authenticate GitHub CLI
+# from: anywhere
 gh auth login
 ```
 
 ---
 
-## What the script does (execution order)
-
-Each function runs in this exact order:
-
-| Step | Function | What it does |
-|------|----------|-------------|
-| 1 | `set_homebrew` | Installs Homebrew, adds to `~/.zprofile` |
-| 2 | `set_apps` | Installs all CLI tools and GUI apps, runs `brew cleanup` |
-| 3 | `set_node` | Installs Node LTS via fnm, installs bun |
-| 4 | `set_dev_dirs` | Creates `~/Development/Personal/OCI/` and `~/Development/Office/` |
-| 5 | `set_gitconfig` | Writes `~/.gitconfig`, `~/.gitconfig-qp`, `~/.gitconfig-personal`, `~/.gitignore_global` |
-| 6 | `set_dotfiles` | Adds Homebrew zsh to `/etc/shells`, installs oh-my-zsh, clones plugins, writes `dotfiles/zsh/.zshrc` |
-| 7 | `set_stow` | Symlinks all `dotfiles/` packages to `~` via GNU Stow |
-| 8 | `set_ssh` | Generates missing SSH keys, adds to Keychain, writes `~/.ssh/config` |
-| 9 | `set_mac_defaults` | Applies Dock, Finder, and keyboard settings |
-
-All actions are logged to `~/setup.log`.
-
----
-
 ## Directory structure
 
-This is load-bearing — git auto-switches your identity based on which directory tree you're in.
+This layout is load-bearing — git identity auto-switches based on which directory tree you're in.
 
 ```
 ~/Development/
 ├── Personal/                    → git identity: siddiky.academic@gmail.com
 │   ├── nvim-setup-config/       ← this repo (all dotfiles live here)
 │   ├── OCI/
-│   │   └── ssh-key-2025-08-11.key  ← OCI instance private key
-│   └── <other personal repos>/
+│   │   └── ssh-key-2025-08-11.key  ← OCI private key (copy manually, Step 3)
+│   └── <other personal repos>
 └── Office/                      → git identity: nur-e-alom.siddiky@questionpro.com
-    └── <QP repos>/
-```
-
-The script creates `Personal/OCI/` and `Office/` automatically. The OCI key must be copied manually (see Quick Start Step 3).
-
----
-
-## Dotfiles architecture (stow)
-
-All configs live inside this repo under `dotfiles/` and are symlinked to their expected locations by GNU Stow. Your entire dev environment is version-controlled.
-
-```
-dotfiles/
-├── zsh/        → ~/.zshrc
-├── nvim/       → ~/.config/nvim/ and ~/.config/nvim.12/
-├── tmux/       → ~/.config/tmux/tmux.conf
-├── starship/   → ~/.config/starship.toml
-├── ghostty/    → ~/.config/ghostty/config
-├── fastfetch/  → ~/.config/fastfetch/config.jsonc
-├── pi/         → ~/.pi/
-└── stow/       → ~/.stow-global-ignore
-```
-
-The `set_stow` step in the script handles this automatically, including backing up any conflicting files.
-
-**Manual stow commands:**
-```bash
-# From repo root — stow all packages
-stow -d dotfiles -t ~ zsh nvim tmux starship ghostty fastfetch pi stow
-
-# Stow a single package
-stow -d dotfiles -t ~ nvim
-
-# Restow (refresh symlinks after adding files to a package)
-stow --restow -d dotfiles -t ~ nvim
-
-# Handle a conflict manually (back up then stow)
-mv ~/.zshrc ~/.zshrc.bak
-stow -d dotfiles -t ~ zsh
+    └── <QP repos>
 ```
 
 ---
 
 ## What gets installed
 
-### CLI tools
+### CLI tools (all platforms)
 
-| Tool | Why you use it |
-|------|---------------|
-| **neovim** | Primary editor. `v` → custom `nvim.12` config (LSP, Telescope, mini.nvim). `vm` → vanilla neovim. |
-| **fnm** | Fast Node Manager (40x faster than nvm). Auto-switches Node version per project on `cd` when `.nvmrc` is found. |
-| **pnpm** | Package manager. Global content-addressed store — 10 projects sharing React 18 store it once. Strict dep resolution. `pi`, `pd`, `pb` aliases. |
-| **bun** | JS runtime + test runner. `bun test` replaces Jest (up to 30x faster). `bun run` is a faster drop-in for `npm run`. |
-| **lazygit** | Terminal git UI (`lg`). Use for: reviewing diffs before a PR, interactive rebase, staging individual hunks. |
-| **gh** | GitHub CLI. `gh pr create`, `gh run watch`, `gh repo clone`. 90% of GitHub without a browser. Requires `gh auth login` after install. |
-| **fzf** | Fuzzy finder. `Ctrl+R` → fuzzy history search. `Ctrl+T` → fuzzy file picker. Used by Neovim Telescope internally. |
-| **tmux** | Terminal multiplexer. Critical for OCI: sessions persist after disconnect. Layout: NestJS left, Vite right, git bottom. |
-| **eza** | Modern `ls`. `ll` shows git status icon per file. Color-coded by type. `lt` → directory tree. |
-| **bat** | Syntax-highlighted `cat`. `cat routes.ts` reads like code with line numbers. |
-| **fd** | Faster `find`. `fd -e tsx Button` — find `.tsx` files with "Button" in the name. |
-| **ripgrep** | Fastest grep. `rg 'useEffect'` scans a full React codebase in under 100ms. Used by Neovim Telescope. |
-| **jq** | JSON processor. `curl api/endpoint \| jq '.data[]'` — parse API responses in terminal. |
-| **git-delta** | Syntax-highlighted git diffs. Used automatically by `git diff`, `git log -p`, `git show`. |
-| **mosh** | SSH with roaming. Survives laptop sleep/wake and WiFi switches. Essential for OCI dev. |
-| **starship** | Shell prompt. Shows: directory, git branch, Node version, exit code. Fast, zero config needed. |
-| **stow** | Dotfile manager. Creates symlinks from `dotfiles/` to `~`. Keeps all configs version-controlled in this repo. |
-| **tree-sitter** | Syntax parser. Required by Neovim for highlighting, code folding, and text objects. |
-| **fastfetch** | System info at startup. Shows machine, CPU, RAM, Node version — useful for knowing what environment you're in. |
+| Tool | Why |
+|------|-----|
+| **neovim** | Primary editor. `v` → nvim.12 config (LSP + plugins). `vm` → vanilla. |
+| **lazygit** | Terminal git UI (`lg`). Diff review, interactive rebase, hunk staging. |
+| **gh** | GitHub CLI — `gh pr create`, `gh run watch`, `gh repo clone`. Requires `gh auth login`. |
+| **fnm** | Fast Node Manager. Auto-switches Node version on `cd` when `.nvmrc` is present. |
+| **pnpm** | Package manager with global content store — shared across projects. |
+| **bun** | JS runtime + test runner. `bun test` is up to 30x faster than Jest. |
+| **fzf** | Fuzzy finder — `Ctrl+R` for history, `Ctrl+T` for files. |
+| **tmux** | Terminal multiplexer. Sessions persist on OCI after disconnect. |
+| **eza** | Modern `ls`. `ll` shows git status per file. `lt` shows directory tree. |
+| **bat** | Syntax-highlighted `cat`. |
+| **fd** | Faster `find`. |
+| **ripgrep** | Fastest grep. Used internally by Neovim Telescope. |
+| **git-delta** | Syntax-highlighted diffs. Auto-used by `git diff`, `git log -p`. |
+| **jq** | JSON processor. Parse API responses: `curl url \| jq '.data[]'`. |
+| **mosh** | SSH with roaming — survives laptop sleep and WiFi changes. Essential for OCI. |
+| **starship** | Shell prompt — directory, git branch, Node version, exit code. |
+| **stow** | Dotfile manager — symlinks `dotfiles/` packages to `~`. |
+| **fastfetch** | System info at shell startup. |
 
 ### GUI apps (macOS only)
 
-| App | Why you use it |
-|-----|---------------|
-| **Ghostty** | Terminal emulator. GPU-accelerated, native macOS. Better color rendering for tmux and syntax highlighting. |
-| **VS Code** | Editor with Remote SSH. `code .` opens current directory. Remote SSH connects to `oci` host for browser-free remote editing. |
-| **Raycast** | Spotlight replacement. Clipboard history (`Cmd+Shift+V`), snippets, window manager, calculator, script runner. |
-| **AltTab** | Window switcher. Switch between two Chrome windows, or two terminal windows — `Cmd+Tab` only shows apps, not windows. |
-| **Shottr** | Screenshot tool. Pixel measurements, color picker, OCR (copy text from screenshots), annotations. |
-| **Mos** | Mouse smoothing. Fixes jerky scroll for external mice (Logitech, etc.). Makes it feel like a trackpad. |
+| App | Why |
+|-----|-----|
+| **Ghostty** | GPU-accelerated terminal. Transparent titlebar with window controls visible. |
+| **VS Code** | Editor + Remote SSH extension for editing directly on OCI. |
+| **Raycast** | Spotlight replacement — clipboard history (`Cmd+Shift+V`), window manager, snippets, folder search. Needs one-time config — see Step 9C. |
+| **AltTab** | Switches between windows of the same app (e.g. two Chrome windows). |
+| **Shottr** | Screenshot with pixel ruler, color picker, OCR, annotations. |
+| **Mos** | Mouse smoothing for external mice — makes scroll feel like a trackpad. |
 
 ---
 
@@ -206,7 +265,7 @@ stow -d dotfiles -t ~ zsh
 
 ### Git identity: directory-based auto-switch
 
-`~/.gitconfig` uses `includeIf` to conditionally load a sub-config based on working directory:
+`~/.gitconfig` uses `includeIf` to load a different sub-config based on working directory:
 
 ```ini
 [includeIf "gitdir/i:~/Development/Office/"]
@@ -216,328 +275,268 @@ stow -d dotfiles -t ~ zsh
   path = ~/.gitconfig-personal    # Nur-E-Alom Siddiky + personal email
 ```
 
-No manual switching needed — git picks the right identity based on where you are.
+No manual switching needed. Always clone repos to the right directory tree — a work repo cloned to `~/Desktop/` will commit under the base identity (no email set).
 
 ```bash
-# Verify identity in any repo
+# from: any git repo — check current identity
 git config user.email
 
-# Expected results:
-cd ~/Development/Personal/some-repo  # → siddiky.academic@gmail.com
-cd ~/Development/Office/qp-repo      # → nur-e-alom.siddiky@questionpro.com
-```
+# from: ~/Development/Personal/some-repo
+git config user.email   # → siddiky.academic@gmail.com
 
-> Always clone repos to the right directory tree. A work repo cloned to `~/Desktop/` will use the base identity (no email set).
+# from: ~/Development/Office/qp-repo
+git config user.email   # → nur-e-alom.siddiky@questionpro.com
+```
 
 ### SSH host architecture
 
-| Host alias | Routes to | Key file | Used for |
-|------------|-----------|----------|----------|
+| Host alias | Routes to | Key | Used for |
+|------------|-----------|-----|----------|
 | `github.com-personal` | github.com | `~/.ssh/id_ed25519_personal` | Personal repos |
 | `github.com-qp` | github.com | `~/.ssh/id_ed25519_qp` | QuestionPro repos |
 | `oci` | 140.245.9.229 | `~/Development/Personal/OCI/ssh-key-2025-08-11.key` | OCI Ubuntu instance |
 
-**Cloning with the right identity:**
+**Always clone using the host alias, not bare `github.com`:**
+
 ```bash
-# Personal repo — clone to Personal/ so git identity also activates
-git clone git@github.com-personal:<username>/repo.git ~/Development/Personal/repo
-
-# Work repo
-git clone git@github.com-qp:questionpro-org/repo.git ~/Development/Office/repo
+# from: anywhere — destination path is explicit in the command
+git clone git@github.com-personal:Nur-E-Alom/repo.git ~/Development/Personal/repo
+git clone git@github.com-qp:questionpro-org/repo.git  ~/Development/Office/repo
 ```
-
-**Test all connections:**
-```bash
-ssh -T git@github.com-personal   # → Hi <personal-username>!
-ssh -T git@github.com-qp         # → Hi na-siddiky-qp!
-ssh oci                          # → connects to Ubuntu 24.04 OCI instance
-```
-
-### tmux on OCI: recommended session layout
-
-```
-┌─────────────────────────────────────────┐
-│  session: expense-tracker               │
-│                                         │
-│  ┌──────────────────┬────────────────┐  │
-│  │ pane 1           │ pane 2         │  │
-│  │ NestJS :3000     │ Vite :5173     │  │
-│  │ pnpm start:dev   │ pnpm dev       │  │
-│  └──────────────────┴────────────────┘  │
-│  ┌──────────────────────────────────┐   │
-│  │ pane 3: git / docker / misc      │   │
-│  └──────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-```
-
-When you close your laptop or switch WiFi, the session keeps running. `oci` reconnects and `tmux attach` resumes exactly here.
 
 ---
 
 ## Daily workflows
 
-### Local React/Node development
+### Local React/Node
 
 ```bash
-# New personal project
+# from: ~ — create and enter new project
 mkdir ~/Development/Personal/my-app && cd $_
-git init
-git config user.email    # verify: siddiky.academic@gmail.com
-pi                       # pnpm install
-pd                       # pnpm dev
+git init && git config user.email   # verify: siddiky.academic@gmail.com
+pi && pd                            # pnpm install, then pnpm dev
 
-# Work feature
-cd ~/Development/Office/qp-project
-git config user.email    # verify: nur-e-alom.siddiky@questionpro.com
+# from: ~/Development/Office/qp-project
 git checkout -b feature/my-feature
-pd                       # pnpm dev
-
-# Open in VS Code
-code .
+pd
 ```
 
-### OCI remote development (expense-tracker-mono)
+### OCI remote development
 
 ```bash
-# Connect — mosh is persistent (survives sleep/WiFi change)
-oci
+# from: anywhere on your Mac — connect to OCI
+oci          # via mosh (survives sleep/WiFi)
+oci-ssh      # plain SSH fallback
 
-# Fallback — plain SSH if mosh is unavailable
-oci-ssh
-
-# On the OCI instance
-cd ~/expense-tracker-mono
-tmux new-session -s dev    # first time
-tmux attach -t dev         # returning
+# on the OCI server, from: ~/expense-tracker-mono
+tmux new-session -s dev    # first time only
+tmux attach -t dev         # returning to existing session
 docker compose up -d postgres
 pnpm run start:dev-all
 ```
 
 | Service | URL |
 |---------|-----|
-| Frontend (Vite) | https://app.140.245.9.229.nip.io/ |
-| Backend (NestJS) | https://api.140.245.9.229.nip.io/ |
-| Swagger UI | https://api.140.245.9.229.nip.io/api |
+| Frontend | https://app.140.245.9.229.nip.io/ |
+| Backend | https://api.140.245.9.229.nip.io/ |
+| Swagger | https://api.140.245.9.229.nip.io/api |
 | Browser IDE | https://code.140.245.9.229.nip.io/ |
 
-```bash
-# VS Code Remote SSH (on your Mac — alternative to browser IDE)
-# 1. Install "Remote - SSH" extension in VS Code
-# 2. Cmd+Shift+P → "Remote-SSH: Connect to Host" → select "oci"
-# No port forwarding needed — Caddy proxy handles all routing
-```
-
-### GitHub multi-account workflow
+### GitHub multi-account
 
 ```bash
-# gh must be authenticated first (one-time setup)
-gh auth login
-
-# Create a PR without opening a browser
+# from: your project directory (e.g. ~/Development/Office/qp-project)
 gh pr create --title "feat: user auth" --body "..."
-gh run watch          # watch CI in terminal
+gh run watch
 gh pr merge --squash
 
-# Clone to the right location (git identity activates automatically)
+# from: anywhere — destination path is explicit
 gh repo clone questionpro-org/repo -- ~/Development/Office/repo
-gh repo clone <personal-username>/repo -- ~/Development/Personal/repo
+gh repo clone Nur-E-Alom/repo      -- ~/Development/Personal/repo
 ```
 
 ---
 
 ## Alias reference
 
-### Editor
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `v` | `NVIM_APPNAME=nvim.12 nvim` | Neovim with your full nvim.12 config |
+| Alias | Expands to | Purpose |
+|-------|-----------|---------|
+| `v` | `NVIM_APPNAME=nvim.12 nvim` | Neovim with full config |
 | `vm` | `nvim` | Vanilla Neovim |
 | `lg` | `lazygit` | Terminal git UI |
-
-### Shell
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
 | `zc` | `nvim ~/.zshrc` | Edit shell config |
 | `zs` | `source ~/.zshrc` | Reload shell config |
 | `ls` | `eza` | Colorized file list |
-| `ll` | `eza -la --git` | Long list with git status per file |
-| `lt` | `eza --tree --level=2` | Directory tree, 2 levels deep |
-| `cat` | `bat --style=plain` | Syntax-highlighted file viewer |
-
-### Node / JS
-
-| Alias | Command |
-|-------|---------|
-| `pi` | `pnpm install` |
-| `pd` | `pnpm dev` |
-| `pb` | `pnpm build` |
-| `px` | `pnpm exec` |
-| `nr` | `npm run` |
-| `nd` | `npm run dev` |
-
-### OCI
-
-| Alias | Command |
-|-------|---------|
-| `oci` | `mosh --ssh='ssh -i ~/Development/Personal/OCI/ssh-key-2025-08-11.key' ubuntu@140.245.9.229` |
-| `oci-ssh` | `ssh oci` (plain SSH fallback) |
-
----
-
-## Post-run checklist
-
-Run these after the script completes and you've opened a new terminal:
-
-```bash
-# ── Toolchain ──────────────────────────────────────────────────────────
-node --version          # → v22.x (LTS)
-pnpm --version          # → 9.x
-bun --version           # → 1.x
-nvim --version          # → NVIM v0.10.x
-code --version          # → 1.9x.x
-
-# ── Dotfiles (stow symlinks) ───────────────────────────────────────────
-ls -la ~/.zshrc         # → symlink to .../dotfiles/zsh/.zshrc
-ls -la ~/.config/nvim   # → symlink to .../dotfiles/nvim/.config/nvim
-
-# ── Git identities ─────────────────────────────────────────────────────
-git -C ~/Development/Personal config user.email
-# → siddiky.academic@gmail.com
-
-git -C ~/Development/Office config user.email
-# → nur-e-alom.siddiky@questionpro.com
-
-# ── GitHub SSH auth ────────────────────────────────────────────────────
-ssh -T git@github.com-qp          # → Hi na-siddiky-qp!
-ssh -T git@github.com-personal    # → Hi <your-username>!
-
-# ── GitHub CLI ─────────────────────────────────────────────────────────
-gh auth status                    # → Logged in to github.com as ...
-
-# ── OCI connection ─────────────────────────────────────────────────────
-oci-ssh                           # → ubuntu@...: Welcome to Ubuntu 24.04
-```
-
-**If personal GitHub SSH fails** — the public key isn't added to your account yet:
-```bash
-cat ~/.ssh/id_ed25519_personal.pub
-# Copy output → github.com → Settings → SSH and GPG keys → New SSH key
-```
-
-**If `gh auth status` fails:**
-```bash
-gh auth login    # follow the browser prompts
-```
+| `ll` | `eza -la --git` | Long list with git status |
+| `lt` | `eza --tree --level=2` | Directory tree |
+| `cat` | `bat --style=plain` | Syntax-highlighted viewer |
+| `pi` | `pnpm install` | |
+| `pd` | `pnpm dev` | |
+| `pb` | `pnpm build` | |
+| `px` | `pnpm exec` | |
+| `nr` | `npm run` | |
+| `nd` | `npm run dev` | |
+| `oci` | `mosh ubuntu@140.245.9.229 ...` | Connect to OCI (persistent) |
+| `oci-ssh` | `ssh oci` | Connect to OCI (plain SSH) |
 
 ---
 
 ## Troubleshooting
 
+**Ghostty shows no minimize/maximize/close buttons**
+The config has `macos-titlebar-style = transparent` but Ghostty must reload it. See the dotfiles package table above — `ghostty` package, reload with `Cmd+Shift+,`. If the file is not a symlink yet:
+```bash
+cd ~/Development/Personal/nvim-setup-config
+stow --restow -d dotfiles -t ~ ghostty
+# Then Cmd+Shift+, inside Ghostty, or quit and reopen
+```
+
+**Dock only shows open apps (not pinned apps)**
+```bash
+# from: anywhere
+defaults delete com.apple.dock static-only && killall Dock
+```
+
 **`z oci` jumps to a directory instead of connecting**
-`z` is the zsh-z directory jumper plugin. `z oci` matches the `~/Development/Personal/OCI/` directory you've visited. To connect to the OCI server, type `oci` (no `z`).
+`z` is the directory jumper plugin — it matched `~/Development/Personal/OCI/`. To connect to the server, type `oci` (no `z`).
 
 **`code` command not found**
-VS Code is installed but the CLI isn't in PATH. This is already fixed in your `.zshrc`. If it still fails after `source ~/.zshrc`:
 ```bash
-# Manually run once from inside VS Code:
-# Cmd+Shift+P → "Shell Command: Install 'code' command in PATH"
-# OR verify the PATH export is in your .zshrc:
-grep "Visual Studio Code" ~/.zshrc
+# from: anywhere
+grep "Visual Studio Code" ~/.zshrc   # confirm PATH entry is present
+# If still missing: inside VS Code → Cmd+Shift+P → "Shell Command: Install 'code' command in PATH"
 ```
 
 **Autosuggestions not visible**
-The suggestion color `fg=244` blends in on some terminal themes. Edit `~/.zshrc` (or `dotfiles/zsh/.zshrc`) and change:
+`fg=244` blends in on some themes. Open the zsh dotfile:
 ```bash
-ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"     # lighter gray
-ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=white" # bright white
+# from: anywhere
+zc   # opens dotfiles/zsh/.zshrc in nvim (via symlink)
+```
+Change the highlight line:
+```
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"     # lighter
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=white" # bright
 ```
 Then `zs` to reload.
 
-**`mosh oci` fails — key not accessible**
-The OCI key must be at `~/Development/Personal/OCI/ssh-key-2025-08-11.key`:
+**`mosh oci` fails — key not found**
 ```bash
+# from: anywhere
 ls -la ~/Development/Personal/OCI/ssh-key-2025-08-11.key
 chmod 600 ~/Development/Personal/OCI/ssh-key-2025-08-11.key
 ```
 
-**`mosh oci` connects SSH but fails on mosh startup**
-mosh is not installed on the OCI server:
+**`mosh oci` connects SSH then fails**
+mosh not on the server:
 ```bash
+# from: anywhere on your Mac
 ssh oci "sudo apt install mosh -y"
+# Also ensure UDP 60000–61000 is open: OCI Console → Networking → VCN → Security Lists
 ```
-Also ensure UDP ports 60000–61000 are open: OCI Console → Networking → VCN → Security Lists → Ingress Rules → add UDP 60000-61000.
 
 **Wrong git identity on a commit**
 ```bash
-git config user.email          # check current identity
-git remote -v                  # verify SSH host alias (should be github.com-qp or github.com-personal)
-```
-Fix an already-wrong commit before push:
-```bash
+# from: the project repo directory
+git config user.email       # check current identity
+git remote -v               # verify SSH host alias is github.com-qp or github.com-personal
+# Fix before push:
 git commit --amend --author="Nur-E-Alom Siddiky <siddiky.academic@gmail.com>" --no-edit
 ```
 
-**`chsh: non-standard shell` during script**
-Homebrew zsh wasn't in `/etc/shells`. The script handles this automatically by running:
-```bash
-echo "/opt/homebrew/bin/zsh" | sudo tee -a /etc/shells
-```
-If it still fails, run that manually then re-run the script.
-
 **`brew` not found after install**
-Homebrew PATH wasn't applied to the current session:
 ```bash
-eval "$(/opt/homebrew/bin/brew shellenv)"
+# from: anywhere
+eval "$(/opt/homebrew/bin/brew shellenv)"   # apply for this session
+# Permanent: already written to ~/.zprofile — restart terminal
 ```
-Restart terminal. This is written to `~/.zprofile` by the script permanently.
 
-**`node` not found after `set_node`**
-fnm PATH isn't applied yet:
+**`node` not found after setup**
 ```bash
-eval "$(fnm env)"
+# from: anywhere
+eval "$(fnm env)"   # apply for this session
+# Permanent: already in ~/.zshrc — run `zs`
 ```
-Permanent after `source ~/.zshrc`.
 
 **SSH key passphrase prompt on every push**
-Add keys to macOS Keychain:
 ```bash
+# from: anywhere
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519_personal
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519_qp
 ```
 
-**Stow conflict on a package**
-A real file exists at the target location (not a symlink):
+**Personal GitHub SSH fails after adding key**
 ```bash
-# Back it up and restow
+# from: anywhere
+cat ~/.ssh/id_ed25519_personal.pub
+# Copy → github.com → Settings → SSH and GPG keys → New SSH key
+```
+
+**Stow conflict on a package**
+```bash
+# from: ~/Development/Personal/nvim-setup-config
 mv ~/.zshrc ~/.zshrc.bak
 stow --restow -d dotfiles -t ~ zsh
 ```
 
 ---
 
-## Maintaining this setup
+## Applying updates to your existing setup
+
+Use this any time you pull new changes from the repo, or after you edit a dotfile directly.
+
+### After `git pull` (someone updated the repo)
 
 ```bash
-# Update all Homebrew packages
-brew update && brew upgrade && brew cleanup
+# from: ~/Development/Personal/nvim-setup-config
+git pull
 
-# Update oh-my-zsh
-omz update
+# Restow any packages whose files changed
+stow --restow -d dotfiles -t ~ <package>   # see dotfiles package table at the top
 
-# Update Neovim plugins
-nvim --headless "+Lazy! update" +qa
+# Then reload the app for that package — see the reload column in the package table
+```
 
-# Check installed packages
-brew list           # CLI tools
-brew list --cask    # GUI apps
+### After you edit a dotfile yourself
 
-# Add a new config to dotfiles (example: adding a new tool config)
+Same two steps: restow the package, reload the app. The dotfiles package table at the top of this README is the reference for both.
+
+```bash
+# Example: you edited dotfiles/ghostty/.config/ghostty/config
+# from: ~/Development/Personal/nvim-setup-config
+stow --restow -d dotfiles -t ~ ghostty
+# Then: Cmd+Shift+, inside Ghostty to reload
+```
+
+### After you run `bash scripts/macinstall.sh` again
+
+The script is fully idempotent — safe to re-run on an existing machine at any time:
+- Homebrew skips already-installed packages
+- oh-my-zsh and plugins skip if already present
+- SSH keys skip if already exist
+- `dotfiles/zsh/.zshrc` skips if already exists (protects your manual edits)
+- All `defaults write` and stow commands re-apply cleanly
+
+Re-run it when you want to: pull in script updates, reset macOS defaults, or refresh all symlinks at once.
+
+---
+
+## Maintenance
+
+```bash
+# from: anywhere
+brew update && brew upgrade && brew cleanup   # update all Homebrew packages
+omz update                                    # update oh-my-zsh
+nvim --headless "+Lazy! update" +qa           # update Neovim plugins
+```
+
+Adding a new tool config to dotfiles:
+```bash
+# from: ~/Development/Personal/nvim-setup-config
 mkdir -p dotfiles/mytool/.config/mytool
 mv ~/.config/mytool dotfiles/mytool/.config/mytool
 stow -d dotfiles -t ~ mytool
-# Now ~/.config/mytool is a symlink and the config is version-controlled
+# ~/.config/mytool is now a symlink — config is version-controlled in this repo
 ```
 
-When you get a new Mac, the steps are exactly the same as **Quick Start → macOS**. The script is idempotent — re-running is safe. It skips what's already installed.
+On a new Mac: repeat from **Mac setup Step 1**. The script is idempotent — re-running skips what's already installed.

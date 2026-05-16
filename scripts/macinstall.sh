@@ -213,10 +213,15 @@ set_dotfiles() {
 
 set_stow() {
   echo -e "${BLUE}Stowing dotfiles...${NC}"
+
+  # stow the 'stow' package first so ~/.stow-global-ignore is active for all subsequent packages
+  stow --restow -d "$DOTFILES_DIR" -t "$HOME" stow 2>/dev/null || true
+
   local pkg stow_err
   for pkg_dir in "$DOTFILES_DIR"/*/; do
     [[ -d "$pkg_dir" ]] || continue
     pkg=$(basename "$pkg_dir")
+    [[ "$pkg" == "stow" ]] && continue  # already done above
 
     if stow --restow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" 2>/dev/null; then
       echo -e "${GREEN}  ✓ $pkg${NC}"
@@ -232,11 +237,21 @@ set_stow() {
         echo -e "${YELLOW}  Warning: could not stow $pkg${NC}"
     fi
   done
+  # Fix any stale hardcoded username paths left in configs (e.g. from another machine)
+  local ghostty_conf="$HOME/.config/ghostty/config"
+  if [[ -f "$ghostty_conf" ]]; then
+    sed -i '' "s|/Users/[^/]*/|$HOME/|g" "$ghostty_conf"
+  fi
+
   notify "Dotfiles stowed"
 }
 
 write_zshrc() {
   mkdir -p "$DOTFILES_DIR/zsh"
+  if [[ -f "$DOTFILES_DIR/zsh/.zshrc" ]]; then
+    echo -e "${GREEN}dotfiles/zsh/.zshrc already exists — skipping (edit it directly to make changes)${NC}"
+    return 0
+  fi
   echo -e "${BLUE}Writing dotfiles/zsh/.zshrc...${NC}"
 
   cat > "$DOTFILES_DIR/zsh/.zshrc" << ZSHRC
@@ -389,14 +404,13 @@ set_dev_dirs() {
 set_mac_defaults() {
   echo -e "${BLUE}Applying macOS defaults...${NC}"
 
-  # Dock — instant autohide, no recents, only open apps
+  # Dock — instant autohide, no recents, pinned + open apps (default behavior)
   defaults write com.apple.dock autohide -bool true
   defaults write com.apple.dock autohide-time-modifier -int 0
   defaults write com.apple.dock autohide-delay -float 0
   defaults write com.apple.dock show-recents -bool false
-  defaults write com.apple.dock static-only -bool true
+  defaults write com.apple.dock static-only -bool false
   defaults write com.apple.dock expose-group-apps -bool true
-  defaults write NSGlobalDomain _HIHideMenuBar -bool true
   killall Dock
 
   # Finder — list view, show extensions, show path bar
@@ -412,7 +426,8 @@ set_mac_defaults() {
   defaults write NSGlobalDomain AppleKeyboardUIMode -int 2
 
   # Spaces — don't span displays
-  defaults write com.apple.spaces spans-displays -bool false && killall SystemUIServer
+  defaults write com.apple.spaces spans-displays -bool false
+  killall SystemUIServer
 
   notify "macOS defaults applied"
 }

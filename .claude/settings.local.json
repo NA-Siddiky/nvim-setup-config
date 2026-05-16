@@ -7,7 +7,21 @@
       "Read(//Applications/Visual Studio Code.app/**)",
       "Bash(cat ~/.ssh/config)",
       "Read(//Users/sid/.ssh/**)",
-      "Bash(chmod 600 ~/Development/Personal/OCI/ssh-key-2025-08-11.key)"
+      "Bash(chmod 600 ~/Development/Personal/OCI/ssh-key-2025-08-11.key)",
+      "Bash(/bin/ls -la ~/.config/ghostty/)",
+      "Bash(/bin/unlink ~/.config/ghostty/config)",
+      "Bash(/bin/ln -sf ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config ~/.config/ghostty/config)",
+      "Bash(/bin/ls -la ~/.config/ghostty/config)",
+      "Bash(/bin/ls -laR ~/.config/ghostty/)",
+      "Bash(/bin/ls -la ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config)",
+      "Bash(/bin/cat ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config)",
+      "Bash(/bin/ls -la ~/.config/)",
+      "Bash(/bin/ls -la ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/)",
+      "Bash(/bin/unlink ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config)",
+      "Bash(/bin/cp ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config.bak ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/config)",
+      "Bash(/bin/ls -la ~/Development/Personal/nvim-setup-config/dotfiles/ghostty/.config/ghostty/)",
+      "Bash(defaults write *)",
+      "Bash(killall Dock)"
     ]
   }
 }

@@ -46,14 +46,14 @@ background-blur = true
 background-opacity = 0.96
 background = #282828
 background-blur-radius = 120
-background-image = /Users/mahi/Pictures/pokemon_bg/183.png
-# managed by scripts/pokemon-bg.sh — run it once to activate
+# background-image = ~/Pictures/pokemon_bg/183.png
+# run scripts/pokemon-bg.sh once to set and activate — it manages this line
 background-image-opacity = 0.15
 background-image-fit = none
 background-image-position = bottom-right
 
-# Titlebar
-macos-titlebar-style = hidden
+# Titlebar — transparent keeps traffic-light buttons visible
+macos-titlebar-style = transparent
 title = " "
 
 # ============================================================================
